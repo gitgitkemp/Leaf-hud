@@ -537,24 +537,61 @@ body { touch-action: none; }
   });
 
   // ---------- Start ----------
-  function startSensors() {
+  var gpsStarted = false, motionStarted = false;
+  function startGps() {
+    if (gpsStarted) return; gpsStarted = true;
     if ('geolocation' in navigator) {
       navigator.geolocation.watchPosition(onPos, onPosErr, { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
     } else { onPosErr({ code: 0 }); }
-    window.addEventListener('devicemotion', onMotion);
-    if ('ondeviceorientationabsolute' in window) window.addEventListener('deviceorientationabsolute', onOrient);
-    else window.addEventListener('deviceorientation', onOrient);
-    keepAwake();
   }
-  $('btnStart').addEventListener('click', function () {
+  function needsMotionAsk() {
+    return (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === 'function') ||
+      (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function');
+  }
+  // Moet vanuit een tik gebeuren: iPhone eist dat voor beweging en kompas.
+  function startMotion() {
+    if (motionStarted) return; motionStarted = true;
     var asks = [];
     if (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === 'function') asks.push(DeviceMotionEvent.requestPermission().catch(function () {}));
     if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') asks.push(DeviceOrientationEvent.requestPermission().catch(function () {}));
     Promise.all(asks).then(function () {
-      $('start').hidden = true;
-      startSensors();
+      window.addEventListener('devicemotion', onMotion);
+      if ('ondeviceorientationabsolute' in window) window.addEventListener('deviceorientationabsolute', onOrient);
+      else window.addEventListener('deviceorientation', onOrient);
+      hideHint();
     });
+    keepAwake();
+  }
+  function showHint() {
+    var el = $('toast'); el.textContent = 'Tik op het scherm voor kompas en G-kracht';
+    clearTimeout(toastTimer); el.classList.add('show');
+  }
+  function hideHint() { $('toast').classList.remove('show'); }
+
+  $('btnStart').addEventListener('click', function () {
+    save('started', true);
+    $('start').hidden = true;
+    startGps();
+    startMotion();
   });
+
+  if (load('started', false)) {
+    // Al eerder gestart: geen startscherm, GPS meteen aan.
+    $('start').hidden = true;
+    startGps();
+    if (needsMotionAsk()) {
+      showHint();
+      var firstTap = function () {
+        document.removeEventListener('click', firstTap, true);
+        document.removeEventListener('touchend', firstTap, true);
+        startMotion();
+      };
+      document.addEventListener('click', firstTap, true);
+      document.addEventListener('touchend', firstTap, true);
+    } else {
+      startMotion();
+    }
+  }
 
   applyColor(false);
   requestAnimationFrame(frame);
