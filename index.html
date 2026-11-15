@@ -132,6 +132,29 @@ body { touch-action: none; }
   font: inherit; font-size: 18px; font-weight: 600; color: var(--bg); background: var(--accent);
   border: 0; border-radius: 999px; padding: 14px 34px; cursor: pointer; min-height: 48px;
 }
+.helpbtn {
+  position: fixed; z-index: 5;
+  top: calc(env(safe-area-inset-top, 0px) + 6px); left: calc(env(safe-area-inset-left, 0px) + 6px);
+  width: 26px; height: 26px; padding: 0; border-radius: 999px;
+  border: 1px solid var(--tick); background: var(--bg); color: var(--dim);
+  font: inherit; font-size: 14px; font-weight: 700; line-height: 1; cursor: pointer;
+}
+.helpbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.help {
+  position: fixed; inset: 0; z-index: 30; background: var(--bg);
+  overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch;
+  padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+}
+.help .in { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+.help h2 { margin: 0; font-size: 22px; letter-spacing: 0.04em; color: var(--accent); }
+.help dl { margin: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.help dt { font-size: 14px; font-weight: 700; color: var(--fg); }
+.help dd { margin: 2px 0 0; font-size: 14px; line-height: 1.45; color: var(--muted); }
+.help .row { display: flex; flex-wrap: wrap; gap: 10px; padding-top: 6px; }
+.help .row button { font: inherit; font-size: 15px; font-weight: 600; border-radius: 999px; padding: 10px 18px; min-height: 44px; cursor: pointer; }
+.help .close { background: var(--accent); color: var(--bg); border: 0; }
+.help .hide { background: transparent; color: var(--muted); border: 1px solid var(--tick); }
+.help .note { font-size: 12px; color: var(--dim); }
 .toast {
   position: fixed; left: 50%; bottom: calc(70px + env(safe-area-inset-bottom)); transform: translateX(-50%);
   background: var(--panel); border: 1px solid var(--accent); color: var(--fg); border-radius: 999px;
@@ -204,6 +227,33 @@ body { touch-action: none; }
   </div>
 </div>
 
+<button class="helpbtn" id="btnHelp" type="button" aria-label="Uitleg">?</button>
+
+<div class="help" id="help" role="dialog" aria-modal="true" aria-labelledby="helpTitle" hidden>
+  <div class="in">
+    <h2 id="helpTitle">Zo werkt je HUD</h2>
+    <dl>
+      <div><dt>Snelheid</dt><dd>Komt van je GPS, ongeveer 1 keer per seconde. De cijfers staan altijd op een vaste plek. Een streepje betekent: nog geen GPS.</dd></div>
+      <div><dt>Golfje-knop</dt><dd>Vloeiend: tussen twee GPS-metingen schat de bewegingssensor je snelheid, zodat het getal soepel meeloopt. Uit: alleen de GPS-meting.</dd></div>
+      <div><dt>Kompas</dt><dd>De streep bovenin laat alle 8 richtingen zien, je richting staat in het kader. Tijdens het rijden gebruikt hij de GPS-rijrichting, stilstaand het kompas van je telefoon.</dd></div>
+      <div><dt>G-kracht</dt><dd>Het bolletje beweegt als je optrekt, remt of door een bocht gaat. Hoe verder van het midden, hoe meer kracht. De rand is 0,5 g.</dd></div>
+      <div><dt>Ritregel onderaan</dt><dd>Rittijd, gereden km en gemiddelde snelheid. Houd de regel 1 seconde vast om je rit te resetten.</dd></div>
+      <div><dt>Bliksem-knop</dt><dd>Toont rit-energie: een schatting van je kWh en de kosten, met 0,21 kWh per km en €0,54 per kWh. Staat standaard uit.</dd></div>
+      <div><dt>P-knop</dt><dd>Tik om je parkeerplek op te slaan. Tik daarna om de pijl en afstand naar je auto te zien. Vasthouden slaat een nieuwe plek op, het kruisje wist hem.</dd></div>
+      <div><dt>Kleuren</dt><dd>Veeg omhoog of omlaag op het scherm om te wisselen tussen groen, blauw, oranje, donkerrood en wit.</dd></div>
+      <div><dt>Straatnaam</dt><dd>Komt van OpenStreetMap, ongeveer elke 30 seconden. Daarvoor gaat je positie naar OpenStreetMap.</dd></div>
+      <div><dt>Toestemming</dt><dd>Na het openen is 1 tik op het scherm nodig voor kompas en G-kracht. Dat eist je iPhone. Je scherm blijft aan zolang de app open is.</dd></div>
+      <div><dt>Updates</dt><dd>Bij het openen haalt de app zelf de nieuwste versie op.</dd></div>
+      <div><dt>Veilig</dt><dd>Bedien de app alleen als je stilstaat. Zet je telefoon vast in een houder.</dd></div>
+    </dl>
+    <div class="row">
+      <button class="close" id="btnHelpClose" type="button">Sluiten</button>
+      <button class="hide" id="btnHelpHide" type="button">Verberg help-knop</button>
+    </div>
+    <p class="note">Verborgen? Tik 5 keer snel op je snelheid om de knop terug te halen.</p>
+  </div>
+</div>
+
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <div class="start" id="start">
@@ -261,7 +311,7 @@ body { touch-action: none; }
   // Swipen
   var ts = null;
   document.addEventListener('touchstart', function (e) {
-    if (e.touches.length !== 1) { ts = null; return; }
+    if (e.touches.length !== 1 || !$('help').hidden) { ts = null; return; }
     ts = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() };
   }, { passive: true });
   document.addEventListener('touchend', function (e) {
@@ -673,7 +723,31 @@ body { touch-action: none; }
 
   // ---------- Automatisch updaten ----------
   // Haalt de nieuwste versie op langs de cache heen en herlaadt als er een nieuwe is.
-  var APP_VERSION = '7';
+  // ---------- Help ----------
+  var helpHidden = load('helpHidden', false);
+  function renderHelpBtn() { $('btnHelp').hidden = helpHidden; }
+  function openHelp() { $('help').hidden = false; $('btnHelpClose').focus({ preventScroll: true }); $('help').scrollTop = 0; }
+  function closeHelp() { $('help').hidden = true; }
+  $('btnHelp').addEventListener('click', openHelp);
+  $('btnHelpClose').addEventListener('click', closeHelp);
+  $('btnHelpHide').addEventListener('click', function () {
+    helpHidden = true; save('helpHidden', true); renderHelpBtn(); closeHelp();
+    toast('Tik 5 keer op je snelheid om hem terug te halen');
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !$('help').hidden) closeHelp(); });
+  var speedTaps = [];
+  $('digits').addEventListener('click', function () {
+    var now = Date.now();
+    speedTaps = speedTaps.filter(function (t) { return now - t < 2500; });
+    speedTaps.push(now);
+    if (speedTaps.length >= 5) {
+      speedTaps = [];
+      if (helpHidden) { helpHidden = false; save('helpHidden', false); renderHelpBtn(); toast('Help-knop is terug'); }
+    }
+  });
+  renderHelpBtn();
+
+  var APP_VERSION = '8';
   function checkUpdate() {
     fetch('./?nocache=' + Date.now(), { cache: 'no-store' })
       .then(function (r) { return r.ok ? r.text() : ''; })
