@@ -68,7 +68,7 @@ body { touch-action: none; }
 .digits { display: flex; gap: 3%; filter: drop-shadow(0 0 12px var(--glow)); height: min(42vh, 170px); }
 .digits svg { height: 100%; width: auto; }
 .digits polygon { fill: transparent; }
-.digits polygon.on { fill: var(--fg); }
+.digits polygon.on { fill: var(--accent); }
 .unit { display: flex; flex-direction: column; gap: 4px; padding-bottom: 6px; }
 .unit .u { font-size: 22px; font-weight: 500; color: var(--muted); letter-spacing: 0.06em; }
 .unit .m { font-size: 11px; color: var(--dim); letter-spacing: 0.1em; text-transform: uppercase; }
@@ -228,7 +228,6 @@ body { touch-action: none; }
     document.documentElement.style.setProperty('--accent', c.hex);
     document.documentElement.style.setProperty('--glow', hexToRgba(c.hex, 0.2));
     var meta = document.querySelector('meta[name="theme-color"]');
-    if (showToast) toast(c.name);
     save('color', colorIdx);
   }
   var toastTimer = null;
