@@ -71,7 +71,12 @@ body { touch-action: none; }
 .digits polygon.on { fill: var(--accent); }
 .unit { display: flex; flex-direction: column; gap: 4px; padding-bottom: 6px; }
 .unit .u { font-size: 22px; font-weight: 500; color: var(--muted); letter-spacing: 0.06em; }
-.unit .m { font-size: 11px; color: var(--dim); letter-spacing: 0.1em; text-transform: uppercase; }
+.mode {
+  font: inherit; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim);
+  background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; min-height: 30px; cursor: pointer;
+}
+.mode[aria-pressed="true"] { color: var(--accent); border-color: var(--tick); }
+.mode:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .side { display: flex; flex-direction: column; justify-content: center; gap: 10px; }
 .tile { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
@@ -145,16 +150,19 @@ body { touch-action: none; }
   overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch;
   padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
 }
-.help .in { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
-.help h2 { margin: 0; font-size: 22px; letter-spacing: 0.04em; color: var(--accent); }
-.help dl { margin: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
-.help dt { font-size: 14px; font-weight: 700; color: var(--fg); }
-.help dd { margin: 2px 0 0; font-size: 14px; line-height: 1.45; color: var(--muted); }
+.help .in { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+.help h2 { margin: 0; font-size: 18px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+.help dl { margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px 20px; }
+.help dl > div { display: grid; grid-template-columns: 22px minmax(0, 1fr); column-gap: 10px; align-items: start; }
+.help .ic { width: 22px; height: 22px; grid-row: span 2; stroke: var(--accent); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; margin-top: 1px; }
+.help .ic text { fill: var(--accent); stroke: none; font-size: 13px; font-weight: 700; font-family: var(--font); }
+.help dt { font-size: 13px; font-weight: 700; color: var(--fg); }
+.help dd { margin: 1px 0 0; font-size: 12px; line-height: 1.35; color: var(--muted); }
 .help .row { display: flex; flex-wrap: wrap; gap: 10px; padding-top: 6px; }
-.help .row button { font: inherit; font-size: 15px; font-weight: 600; border-radius: 999px; padding: 10px 18px; min-height: 44px; cursor: pointer; }
+.help .row button { font: inherit; font-size: 14px; font-weight: 600; border-radius: 999px; padding: 8px 16px; min-height: 40px; cursor: pointer; }
 .help .close { background: var(--accent); color: var(--bg); border: 0; }
 .help .hide { background: transparent; color: var(--muted); border: 1px solid var(--tick); }
-.help .note { font-size: 12px; color: var(--dim); }
+.help .note { margin: 0; font-size: 11px; color: var(--dim); }
 .toast {
   position: fixed; left: 50%; bottom: calc(70px + env(safe-area-inset-bottom)); transform: translateX(-50%);
   background: var(--panel); border: 1px solid var(--accent); color: var(--fg); border-radius: 999px;
@@ -174,7 +182,7 @@ body { touch-action: none; }
   <div class="main">
     <div class="speedwrap">
       <div class="digits" id="digits" role="img" aria-label="Snelheid"></div>
-      <div class="unit"><span class="u">km/u</span><span class="m" id="mode">vloeiend</span></div>
+      <div class="unit"><span class="u">km/u</span><button class="mode" id="btnSmooth" type="button" aria-pressed="true" aria-label="Wissel tussen vloeiende snelheid en alleen GPS"><span id="mode">vloeiend</span></button></div>
     </div>
 
     <div class="side">
@@ -217,9 +225,6 @@ body { touch-action: none; }
     <div class="right">
       <span class="trip" id="trip" title="Houd 1 seconde vast om de rit te resetten"><span id="tTime">0:00</span><span class="sep">·</span><span id="tDist">0,0 km</span><span class="sep">·</span><span id="tAvg">⌀ 0 km/u</span></span>
       <button class="rb" id="btnPark" type="button" aria-pressed="false" aria-label="Parkeerplek opslaan of tonen. Vasthouden slaat een nieuwe plek op."><span class="p">P</span></button>
-      <button class="rb" id="btnSmooth" type="button" aria-pressed="true" aria-label="Vloeiende snelheid aan of uit">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12c2.5-5 5-5 7.5 0s5 5 7.5 0 3.5-3 5-3"></path></svg>
-      </button>
       <button class="rb" id="btnEnergy" type="button" aria-pressed="false" aria-label="Rit-energie tonen of verbergen">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"></path></svg>
       </button>
@@ -233,18 +238,18 @@ body { touch-action: none; }
   <div class="in">
     <h2 id="helpTitle">Zo werkt je HUD</h2>
     <dl>
-      <div><dt>Snelheid</dt><dd>Komt van je GPS, ongeveer 1 keer per seconde. De cijfers staan altijd op een vaste plek. Een streepje betekent: nog geen GPS.</dd></div>
-      <div><dt>Golfje-knop</dt><dd>Vloeiend: tussen twee GPS-metingen schat de bewegingssensor je snelheid, zodat het getal soepel meeloopt. Uit: alleen de GPS-meting.</dd></div>
-      <div><dt>Kompas</dt><dd>De streep bovenin laat alle 8 richtingen zien, je richting staat in het kader. Tijdens het rijden gebruikt hij de GPS-rijrichting, stilstaand het kompas van je telefoon.</dd></div>
-      <div><dt>G-kracht</dt><dd>Het bolletje beweegt als je optrekt, remt of door een bocht gaat. Hoe verder van het midden, hoe meer kracht. De rand is 0,5 g.</dd></div>
-      <div><dt>Ritregel onderaan</dt><dd>Rittijd, gereden km en gemiddelde snelheid. Houd de regel 1 seconde vast om je rit te resetten.</dd></div>
-      <div><dt>Bliksem-knop</dt><dd>Toont rit-energie: een schatting van je kWh en de kosten, met 0,21 kWh per km en €0,54 per kWh. Staat standaard uit.</dd></div>
-      <div><dt>P-knop</dt><dd>Tik om je parkeerplek op te slaan. Tik daarna om de pijl en afstand naar je auto te zien. Vasthouden slaat een nieuwe plek op, het kruisje wist hem.</dd></div>
-      <div><dt>Kleuren</dt><dd>Veeg omhoog of omlaag op het scherm om te wisselen tussen groen, blauw, oranje, donkerrood en wit.</dd></div>
-      <div><dt>Straatnaam</dt><dd>Komt van OpenStreetMap, ongeveer elke 30 seconden. Daarvoor gaat je positie naar OpenStreetMap.</dd></div>
-      <div><dt>Toestemming</dt><dd>Na het openen is 1 tik op het scherm nodig voor kompas en G-kracht. Dat eist je iPhone. Je scherm blijft aan zolang de app open is.</dd></div>
-      <div><dt>Updates</dt><dd>Bij het openen haalt de app zelf de nieuwste versie op.</dd></div>
-      <div><dt>Veilig</dt><dd>Bedien de app alleen als je stilstaat. Zet je telefoon vast in een houder.</dd></div>
+      <div><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17a8 8 0 1 1 16 0"></path><path d="M12 17l4-5"></path></svg><dt>Snelheid</dt><dd>Van je GPS, ±1 keer per seconde. Cijfers staan op een vaste plek. Een streepje: nog geen GPS.</dd></div>
+      <div><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12c2.5-5 5-5 7.5 0s5 5 7.5 0 3.5-3 5-3"></path></svg><dt>Vloeiend of alleen GPS</dt><dd>Tik op het label onder km/u. Vloeiend vult de snelheid aan met de bewegingssensor tussen twee GPS-metingen.</dd></div>
+      <div><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M15 9l-2 4-4 2 2-4z"></path></svg><dt>Kompas</dt><dd>Alle 8 richtingen in de streep bovenin, jouw richting in het kader. Rijdend GPS-koers, stilstaand het telefoonkompas.</dd></div>
+      <div><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="4"></circle><circle cx="14" cy="9" r="1.5"></circle></svg><dt>G-kracht</dt><dd>Bolletje beweegt bij optrekken, remmen en bochten. De rand is 0,5 g.</dd></div>
+      <div><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="18" r="2"></circle><circle cx="18" cy="6" r="2"></circle><path d="M8 18h7a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7"></path></svg><dt>Ritregel</dt><dd>Rittijd, km en gemiddelde. Houd 1 seconde vast om te resetten.</dd></div>
+      <div><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"></path></svg><dt>Rit-energie</dt><dd>Schatting van kWh en kosten (0,21 kWh/km, €0,54/kWh). Staat standaard uit.</dd></div>
+      <div><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="8"></rect><text x="12" y="16.5" text-anchor="middle">P</text></svg><dt>Parkeerplek</dt><dd>Tik: plek opslaan, daarna pijl en afstand naar je auto. Vasthouden: nieuwe plek. Kruisje: wissen.</dd></div>
+      <div><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c4 5 6 8 6 11a6 6 0 0 1-12 0c0-3 2-6 6-11z"></path></svg><dt>Kleuren</dt><dd>Veeg omhoog of omlaag: groen, blauw, oranje, donkerrood, wit.</dd></div>
+      <div><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6-6-6-11a6 6 0 0 1 12 0c0 5-6 11-6 11z"></path><circle cx="12" cy="10" r="2"></circle></svg><dt>Straatnaam</dt><dd>Via OpenStreetMap, ±elke 30 s. Je positie gaat daarvoor naar OpenStreetMap.</dd></div>
+      <div><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><circle cx="12" cy="12" r="8" stroke-dasharray="3 3"></circle></svg><dt>Toestemming</dt><dd>Na openen 1 tik op het scherm voor kompas en G-kracht. Dat eist je iPhone. Scherm blijft aan.</dd></div>
+      <div><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7"></path><path d="M20 4v5h-5"></path></svg><dt>Updates</dt><dd>Bij openen haalt de app zelf de nieuwste versie op.</dd></div>
+      <div><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z"></path></svg><dt>Veilig</dt><dd>Alleen bedienen als je stilstaat, telefoon vast in een houder.</dd></div>
     </dl>
     <div class="row">
       <button class="close" id="btnHelpClose" type="button">Sluiten</button>
@@ -747,7 +752,7 @@ body { touch-action: none; }
   });
   renderHelpBtn();
 
-  var APP_VERSION = '8';
+  var APP_VERSION = '9';
   function checkUpdate() {
     fetch('./?nocache=' + Date.now(), { cache: 'no-store' })
       .then(function (r) { return r.ok ? r.text() : ''; })
