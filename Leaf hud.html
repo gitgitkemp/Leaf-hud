@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Leaf HUD">
+<meta name="theme-color" content="#050607">
+<title>Leaf HUD</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: kompasstreep boven, snelheid groot links/midden, G-kracht rechts, dunne ritregel onder. Staand: alles onder elkaar. */
+:root {
+  --bg: #050607;
+  --panel: #0E1113;
+  --line: #1C2125;
+  --tick: #33393E;
+  --dim: #5C656B;
+  --muted: #9AA3A8;
+  --soft: #C9D0D4;
+  --fg: #F2F5F3;
+  --accent: #3DDC97;
+  --glow: rgba(61, 220, 151, 0.2);
+  --font: 'Chakra Petch', 'DIN Alternate', 'Avenir Next Condensed', system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body {
+  margin: 0; height: 100%; overflow: hidden;
+  background: var(--bg); color: var(--fg);
+  font-family: var(--font);
+  -webkit-user-select: none; user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+body { touch-action: none; }
+.app {
+  height: 100%;
+  padding: max(12px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  display: flex; flex-direction: column; gap: 10px;
+}
+
+/* Kompas */
+.compass { position: relative; height: 54px; flex: none; border-bottom: 1px solid var(--line); overflow: hidden; }
+.compass .mark { position: absolute; top: 0; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; will-change: left; }
+.compass .tk { width: 1px; height: 8px; background: var(--tick); }
+.compass .mark.major .tk { width: 2px; height: 12px; background: var(--dim); }
+.compass .mark.north .tk { background: var(--accent); }
+.compass .lbl { font-size: 14px; font-weight: 500; color: var(--muted); line-height: 1; }
+.compass .mark.major .lbl { font-size: 15px; font-weight: 600; color: var(--soft); }
+.compass .mark.north .lbl { font-size: 17px; font-weight: 700; color: var(--accent); }
+.compass .box {
+  position: absolute; left: 50%; top: 0; transform: translateX(-50%);
+  width: 88px; height: 46px; border: 1.5px solid var(--accent); border-radius: 10px; background: var(--bg);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 2;
+}
+.compass .box b { font-size: 20px; font-weight: 700; line-height: 1; }
+.compass .box span { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; line-height: 1.25; }
+
+/* Midden */
+.main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 24px; align-items: center; }
+.speedwrap { display: flex; align-items: flex-end; justify-content: center; gap: 14px; min-width: 0; }
+.digits { display: flex; gap: 3%; filter: drop-shadow(0 0 12px var(--glow)); height: min(42vh, 170px); }
+.digits svg { height: 100%; width: auto; }
+.digits polygon { fill: transparent; }
+.digits polygon.on { fill: var(--fg); }
+.unit { display: flex; flex-direction: column; gap: 4px; padding-bottom: 6px; }
+.unit .u { font-size: 22px; font-weight: 500; color: var(--muted); letter-spacing: 0.06em; }
+.unit .m { font-size: 11px; color: var(--dim); letter-spacing: 0.1em; text-transform: uppercase; }
+
+.side { display: flex; flex-direction: column; justify-content: center; gap: 10px; }
+.tile { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+.tile.g { flex-direction: row; align-items: center; gap: 14px; }
+.tile .k { font-size: 11px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+.tile .v { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.tile .s { font-size: 12px; color: var(--muted); }
+.gsvg { width: 72px; height: 72px; flex: none; }
+.gsvg .dot { fill: var(--accent); }
+
+/* Onderregel */
+.bar { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 15px; font-variant-numeric: tabular-nums; }
+.bar .clock { font-weight: 600; color: var(--accent); }
+.bar .place { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; text-align: center; }
+.bar .right { display: flex; align-items: center; gap: 12px; }
+.trip { display: flex; gap: 12px; white-space: nowrap; }
+.trip .sep { color: var(--dim); }
+.rb {
+  width: 32px; height: 32px; padding: 0; border-radius: 999px; border: 1px solid var(--tick); background: transparent;
+  display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--dim);
+}
+.rb[aria-pressed="true"] { border-color: var(--accent); background: var(--panel); color: var(--accent); }
+.rb svg { stroke: currentColor; }
+.rb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Staand */
+@media (orientation: portrait) {
+  .app { padding-top: max(40px, env(safe-area-inset-top)); gap: 22px; }
+  .main { grid-template-columns: 1fr; grid-template-rows: 1fr auto; gap: 22px; }
+  .speedwrap { flex-direction: column; align-items: center; }
+  .unit { align-items: center; padding: 0; }
+  .digits { height: min(20vh, 150px); }
+  .bar { flex-direction: column; align-items: stretch; gap: 8px; }
+  .bar .top { display: flex; justify-content: space-between; gap: 12px; }
+  .bar .place { text-align: right; }
+  .compass .box { width: 70px; }
+}
+@media (orientation: landscape) {
+  .bar .top { display: contents; }
+}
+
+/* Start en melding */
+.start {
+  position: fixed; inset: 0; z-index: 20; background: var(--bg);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 24px; text-align: center;
+}
+.start h1 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: 0.04em; }
+.start p { margin: 0; max-width: 34ch; color: var(--muted); font-size: 15px; line-height: 1.45; }
+.start button {
+  font: inherit; font-size: 18px; font-weight: 600; color: var(--bg); background: var(--accent);
+  border: 0; border-radius: 999px; padding: 14px 34px; cursor: pointer; min-height: 48px;
+}
+.toast {
+  position: fixed; left: 50%; bottom: calc(70px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+  background: var(--panel); border: 1px solid var(--accent); color: var(--fg); border-radius: 999px;
+  padding: 8px 18px; font-size: 15px; font-weight: 600; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 10;
+}
+.toast.show { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <div class="compass" id="compass" role="img" aria-label="Kompas">
+    <div class="box"><b id="dirName">N</b><span id="dirDeg">0°</span></div>
+  </div>
+
+  <div class="main">
+    <div class="speedwrap">
+      <div class="digits" id="digits" role="img" aria-label="Snelheid"></div>
+      <div class="unit"><span class="u">km/u</span><span class="m" id="mode">vloeiend</span></div>
+    </div>
+
+    <div class="side">
+      <div class="tile g">
+        <svg class="gsvg" viewBox="0 0 46 46" aria-hidden="true">
+          <circle cx="23" cy="23" r="21" fill="none" stroke="#33393E" stroke-width="1.2"></circle>
+          <circle cx="23" cy="23" r="10" fill="none" stroke="#1C2125" stroke-width="1.2"></circle>
+          <line x1="23" y1="4" x2="23" y2="42" stroke="#1C2125" stroke-width="0.8"></line>
+          <line x1="4" y1="23" x2="42" y2="23" stroke="#1C2125" stroke-width="0.8"></line>
+          <circle class="dot" id="gdot" cx="23" cy="23" r="3.5"></circle>
+        </svg>
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <span class="k">G-kracht</span>
+          <span class="v" id="gval">0,00 g</span>
+          <span class="s" id="gtxt">rustig</span>
+        </div>
+      </div>
+      <div class="tile" id="energyTile" hidden>
+        <span class="k">Rit-energie</span>
+        <span class="v" id="ekwh">≈ 0,0 kWh</span>
+        <span class="s" id="ecost">≈ €0,00 bij €0,54</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="bar" id="bar">
+    <div class="top">
+      <span class="clock" id="clock">--:--</span>
+      <span class="place" id="place">GPS zoeken…</span>
+    </div>
+    <div class="right">
+      <span class="trip" id="trip" title="Houd 1 seconde vast om de rit te resetten"><span id="tTime">0:00</span><span class="sep">·</span><span id="tDist">0,0 km</span><span class="sep">·</span><span id="tAvg">⌀ 0 km/u</span></span>
+      <button class="rb" id="btnSmooth" type="button" aria-pressed="true" aria-label="Vloeiende snelheid aan of uit">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12c2.5-5 5-5 7.5 0s5 5 7.5 0 3.5-3 5-3"></path></svg>
+      </button>
+      <button class="rb" id="btnEnergy" type="button" aria-pressed="false" aria-label="Rit-energie tonen of verbergen">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"></path></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<div class="start" id="start">
+  <h1>LEAF HUD</h1>
+  <p>Zet je telefoon vast in de houder en tik op Start. Geef toegang tot je locatie en beweging, anders werken snelheid, kompas en G-kracht niet.</p>
+  <button type="button" id="btnStart">Start</button>
+  <p style="font-size:13px">Veeg omhoog of omlaag om van kleur te wisselen. Houd de ritregel 1 seconde vast om je rit te resetten.</p>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ---------- Instellingen ----------
+  var KWH_PER_KM = 0.21;   // praktijkverbruik Leaf 40 kWh incl. laadverlies
+  var PRICE_KWH = 0.54;    // publiek laden
+  var COLORS = [
+    { name: 'Groen', hex: '#3DDC97' },
+    { name: 'Blauw', hex: '#4FB3FF' },
+    { name: 'Oranje', hex: '#FFB547' },
+    { name: 'Roze', hex: '#FF6FAE' },
+    { name: 'Wit', hex: '#F2F5F3' }
+  ];
+  var DIRS = ['N', 'NO', 'O', 'ZO', 'Z', 'ZW', 'W', 'NW'];
+
+  // ---------- Opslag ----------
+  function load(k, d) { try { var v = localStorage.getItem('hud.' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } }
+  function save(k, v) { try { localStorage.setItem('hud.' + k, JSON.stringify(v)); } catch (e) {} }
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---------- Kleuren ----------
+  var colorIdx = load('color', 0);
+  function hexToRgba(h, a) {
+    var n = parseInt(h.slice(1), 16);
+    return 'rgba(' + (n >> 16 & 255) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',' + a + ')';
+  }
+  function applyColor(showToast) {
+    var c = COLORS[colorIdx];
+    document.documentElement.style.setProperty('--accent', c.hex);
+    document.documentElement.style.setProperty('--glow', hexToRgba(c.hex, 0.2));
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (showToast) toast(c.name);
+    save('color', colorIdx);
+  }
+  var toastTimer = null;
+  function toast(t) {
+    var el = $('toast'); el.textContent = t; el.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.classList.remove('show'); }, 900);
+  }
+  function stepColor(dir) {
+    colorIdx = (colorIdx + dir + COLORS.length) % COLORS.length;
+    applyColor(true);
+  }
+
+  // Swipen
+  var ts = null;
+  document.addEventListener('touchstart', function (e) {
+    if (e.touches.length !== 1) { ts = null; return; }
+    ts = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() };
+  }, { passive: true });
+  document.addEventListener('touchend', function (e) {
+    if (!ts) return;
+    var t = e.changedTouches[0];
+    var dx = t.clientX - ts.x, dy = t.clientY - ts.y;
+    if (Math.abs(dy) > 50 && Math.abs(dy) > Math.abs(dx) * 1.5 && Date.now() - ts.t < 800) {
+      stepColor(dy < 0 ? 1 : -1);
+    }
+    ts = null;
+  }, { passive: true });
+  // Desktop: pijltjes of scrollwiel
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowUp') stepColor(1);
+    if (e.key === 'ArrowDown') stepColor(-1);
+  });
+  var wheelLock = 0;
+  document.addEventListener('wheel', function (e) {
+    var now = Date.now(); if (now - wheelLock < 400 || Math.abs(e.deltaY) < 20) return;
+    wheelLock = now; stepColor(e.deltaY > 0 ? -1 : 1);
+  }, { passive: true });
+
+  // ---------- 7-segment ----------
+  var SEG = {
+    a: '9,7 14,2 46,2 51,7 46,12 14,12',
+    b: '53,10 58,15 58,47 53,52 48,47 48,15',
+    c: '53,58 58,63 58,95 53,100 48,95 48,63',
+    d: '9,103 14,98 46,98 51,103 46,108 14,108',
+    e: '7,58 12,63 12,95 7,100 2,95 2,63',
+    f: '7,10 12,15 12,47 7,52 2,47 2,15',
+    g: '9,55 14,50 46,50 51,55 46,60 14,60'
+  };
+  var MAP = { '0': 'abcdef', '1': 'bc', '2': 'abdeg', '3': 'abcdg', '4': 'bcfg', '5': 'acdfg', '6': 'acdefg', '7': 'abc', '8': 'abcdefg', '9': 'abcdfg', '-': 'g', ' ': '' };
+  var NS = 'http://www.w3.org/2000/svg';
+  var digitEls = [];
+  (function buildDigits() {
+    var wrap = $('digits');
+    for (var i = 0; i < 3; i++) {
+      var svg = document.createElementNS(NS, 'svg');
+      svg.setAttribute('viewBox', '0 0 66 110');
+      svg.setAttribute('aria-hidden', 'true');
+      var g = document.createElementNS(NS, 'g');
+      g.setAttribute('transform', 'translate(6 0) skewX(-5)');
+      var segs = {};
+      Object.keys(SEG).forEach(function (k) {
+        var p = document.createElementNS(NS, 'polygon');
+        p.setAttribute('points', SEG[k]);
+        g.appendChild(p); segs[k] = p;
+      });
+      svg.appendChild(g); wrap.appendChild(svg); digitEls.push(segs);
+    }
+  })();
+  var lastShown = null;
+  function showSpeed(str) {
+    str = str.padStart(3, ' ').slice(-3);
+    if (str === lastShown) return;
+    lastShown = str;
+    for (var i = 0; i < 3; i++) {
+      var on = MAP[str[i]] || '';
+      var segs = digitEls[i];
+      for (var k in segs) segs[k].classList.toggle('on', on.indexOf(k) >= 0);
+    }
+    $('digits').setAttribute('aria-label', str.trim() === '-' || str.trim() === '' ? 'Snelheid onbekend' : str.trim() + ' km/u');
+  }
+  showSpeed('  -');
+
+  // ---------- Kompas ----------
+  var marks = [];
+  (function buildCompass() {
+    var c = $('compass');
+    for (var i = 0; i < 16; i++) {
+      var deg = i * 22.5;
+      var m = document.createElement('div');
+      m.className = 'mark';
+      var tk = document.createElement('div'); tk.className = 'tk'; m.appendChild(tk);
+      if (i % 2 === 0) {
+        var name = DIRS[i / 2];
+        if (name.length === 1) m.classList.add('major');
+        if (name === 'N') m.classList.add('north');
+        var l = document.createElement('div'); l.className = 'lbl'; l.textContent = name; m.appendChild(l);
+      }
+      c.insertBefore(m, c.firstChild);
+      marks.push({ el: m, deg: deg });
+    }
+  })();
+  var shownHeading = null;
+  function renderCompass(h) {
+    var hr = Math.round(h) % 360;
+    if (hr === shownHeading) return;
+    shownHeading = hr;
+    var cw = $('compass').clientWidth || 800;
+    var half = ($('compass').querySelector('.box').offsetWidth || 88) / 2 + 16;
+    for (var i = 0; i < marks.length; i++) {
+      var rel = ((marks[i].deg - h + 540) % 360) - 180;
+      var px = rel / 360 * cw;
+      marks[i].el.style.left = (50 + rel / 360 * 100) + '%';
+      marks[i].el.style.visibility = Math.abs(px) < half || Math.abs(px) > cw / 2 - 12 ? 'hidden' : 'visible';
+    }
+    $('dirName').textContent = DIRS[Math.round(hr / 45) % 8];
+    $('dirDeg').textContent = hr + '°';
+    $('compass').setAttribute('aria-label', 'Richting ' + hr + ' graden, ' + DIRS[Math.round(hr / 45) % 8]);
+  }
+  renderCompass(0);
+
+  // ---------- Toestand ----------
+  var smoothOn = load('smooth', true);
+  var energyOn = load('energy', false);
+  var gpsSpeed = null;        // km/u laatste fix
+  var gpsAt = 0;              // ms
+  var estSpeed = null;        // km/u geschat
+  var gpsHeading = null;
+  var magHeading = null;
+  var heading = 0;
+  var trip = load('trip', null) || { dist: 0, start: Date.now() };
+  var lastFix = null;
+  var aLong = 0, aLat = 0;    // gefilterd, m/s^2
+  var lastMotion = 0;
+
+  function setBtn(id, on) { $(id).setAttribute('aria-pressed', on ? 'true' : 'false'); }
+  setBtn('btnSmooth', smoothOn); setBtn('btnEnergy', energyOn);
+  $('energyTile').hidden = !energyOn;
+  $('mode').textContent = smoothOn ? 'vloeiend' : 'alleen GPS';
+  $('btnSmooth').addEventListener('click', function () {
+    smoothOn = !smoothOn; save('smooth', smoothOn); setBtn('btnSmooth', smoothOn);
+    $('mode').textContent = smoothOn ? 'vloeiend' : 'alleen GPS';
+  });
+  $('btnEnergy').addEventListener('click', function () {
+    energyOn = !energyOn; save('energy', energyOn); setBtn('btnEnergy', energyOn);
+    $('energyTile').hidden = !energyOn;
+  });
+
+  // Rit resetten: 1 seconde vasthouden
+  var holdTimer = null;
+  function startHold() { holdTimer = setTimeout(function () { trip = { dist: 0, start: Date.now() }; save('trip', trip); lastFix = null; toast('Rit gereset'); renderTrip(); }, 1000); }
+  function endHold() { clearTimeout(holdTimer); }
+  $('trip').addEventListener('touchstart', startHold, { passive: true });
+  $('trip').addEventListener('touchend', endHold);
+  $('trip').addEventListener('touchcancel', endHold);
+  $('trip').addEventListener('mousedown', startHold);
+  $('trip').addEventListener('mouseup', endHold);
+
+  // ---------- GPS ----------
+  function hav(a, b) {
+    var R = 6371000, toR = Math.PI / 180;
+    var dLat = (b.lat - a.lat) * toR, dLon = (b.lon - a.lon) * toR;
+    var s = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(a.lat * toR) * Math.cos(b.lat * toR) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return 2 * R * Math.asin(Math.sqrt(s));
+  }
+  function onPos(p) {
+    var c = p.coords, now = Date.now();
+    var sp = c.speed;
+    var fix = { lat: c.latitude, lon: c.longitude, t: p.timestamp || now };
+    if ((sp === null || isNaN(sp) || sp < 0) && lastFix) {
+      var dt = (fix.t - lastFix.t) / 1000;
+      sp = dt > 0 ? hav(lastFix, fix) / dt : 0;
+    }
+    sp = Math.max(0, (sp || 0) * 3.6);
+    if (lastFix && c.accuracy < 35) {
+      var d = hav(lastFix, fix);
+      if (sp > 2 && d < 500) { trip.dist += d; save('trip', trip); }
+    }
+    if (c.accuracy < 35 || !lastFix) lastFix = fix;
+    gpsSpeed = sp; gpsAt = now; estSpeed = sp;
+    gpsHeading = (c.heading !== null && !isNaN(c.heading) && sp > 8) ? c.heading : null;
+    maybePlace(c.latitude, c.longitude);
+    if (placeEl.textContent === 'GPS zoeken…' || placeEl.dataset.err) { placeEl.textContent = '±' + Math.round(c.accuracy) + ' m'; delete placeEl.dataset.err; }
+  }
+  var placeEl = $('place');
+  function onPosErr(e) {
+    placeEl.textContent = e.code === 1 ? 'Geen toegang tot locatie' : 'GPS niet beschikbaar';
+    placeEl.dataset.err = '1';
+  }
+
+  // Straatnaam via OpenStreetMap (max 1 keer per 30 s en na 150 m)
+  var lastPlaceAt = 0, lastPlacePos = null, placeBusy = false;
+  function maybePlace(lat, lon) {
+    var now = Date.now();
+    if (placeBusy || now - lastPlaceAt < 30000) return;
+    if (lastPlacePos && hav(lastPlacePos, { lat: lat, lon: lon }) < 150) return;
+    placeBusy = true; lastPlaceAt = now; lastPlacePos = { lat: lat, lon: lon };
+    fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=17&accept-language=nl&lat=' + lat + '&lon=' + lon)
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        if (!j || !j.address) return;
+        var a = j.address;
+        var road = a.road || a.pedestrian || a.cycleway || a.path || '';
+        var town = a.city || a.town || a.village || a.suburb || '';
+        var t = [road, town].filter(Boolean).join(', ');
+        if (t) placeEl.textContent = t;
+      })
+      .catch(function () {})
+      .then(function () { placeBusy = false; });
+  }
+
+  // ---------- Beweging en kompas ----------
+  function screenAngle() {
+    if (screen.orientation && typeof screen.orientation.angle === 'number') return screen.orientation.angle;
+    return typeof window.orientation === 'number' ? window.orientation : 0;
+  }
+  function onMotion(e) {
+    var a = e.acceleration;
+    if (!a || a.x === null) return;
+    var ang = screenAngle();
+    // Telefoon rechtop in houder, scherm naar bestuurder. Vooruit = van het scherm af = -z.
+    var lon = -(a.z || 0);
+    var lat;
+    if (ang === 90) lat = -(a.y || 0);
+    else if (ang === -90 || ang === 270) lat = (a.y || 0);
+    else lat = (a.x || 0);
+    var k = 0.15;
+    aLong += (lon - aLong) * k;
+    aLat += (lat - aLat) * k;
+    var now = performance.now();
+    var dt = lastMotion ? (now - lastMotion) / 1000 : 0;
+    lastMotion = now;
+    // Vloeiende snelheid tussen GPS-fixes
+    if (smoothOn && estSpeed !== null && dt > 0 && dt < 0.2 && Date.now() - gpsAt < 2500) {
+      estSpeed = Math.max(0, estSpeed + aLong * dt * 3.6);
+      // blijf dicht bij de laatste GPS-meting
+      if (gpsSpeed !== null) estSpeed = Math.min(Math.max(estSpeed, gpsSpeed - 6), gpsSpeed + 6);
+    }
+  }
+  function onOrient(e) {
+    var h = null;
+    if (typeof e.webkitCompassHeading === 'number' && !isNaN(e.webkitCompassHeading)) {
+      h = e.webkitCompassHeading + screenAngle();
+    } else if (e.absolute && typeof e.alpha === 'number') {
+      h = 360 - e.alpha + screenAngle();
+    }
+    if (h !== null) magHeading = (h % 360 + 360) % 360;
+  }
+
+  // ---------- Render-lus ----------
+  function fmt1(n) { return n.toFixed(1).replace('.', ','); }
+  function fmt2(n) { return n.toFixed(2).replace('.', ','); }
+  function renderTrip() {
+    var secs = Math.max(0, (Date.now() - trip.start) / 1000);
+    var h = Math.floor(secs / 3600), m = Math.floor(secs / 60) % 60;
+    $('tTime').textContent = h + ':' + String(m).padStart(2, '0');
+    var km = trip.dist / 1000;
+    $('tDist').textContent = fmt1(km) + ' km';
+    $('tAvg').textContent = '⌀ ' + (secs > 60 ? Math.round(km / (secs / 3600)) : 0) + ' km/u';
+    var kwh = km * KWH_PER_KM;
+    $('ekwh').textContent = '≈ ' + fmt1(kwh) + ' kWh';
+    $('ecost').textContent = '≈ €' + fmt2(kwh * PRICE_KWH) + ' bij €' + fmt2(PRICE_KWH);
+  }
+  var lastSlow = 0;
+  function frame() {
+    // Snelheid
+    if (gpsSpeed === null || Date.now() - gpsAt > 5000) showSpeed('  -');
+    else showSpeed(String(Math.round(smoothOn && estSpeed !== null ? estSpeed : gpsSpeed)));
+    // Richting: GPS-koers bij rijden, anders magnetisch kompas
+    var target = gpsHeading !== null ? gpsHeading : magHeading;
+    if (target !== null) {
+      var diff = ((target - heading + 540) % 360) - 180;
+      heading = (heading + diff * 0.15 + 360) % 360;
+      renderCompass(heading);
+    }
+    // G-kracht
+    var gl = aLong / 9.81, gt = aLat / 9.81;
+    var mag = Math.sqrt(gl * gl + gt * gt);
+    var scale = 18 / 0.5; // 0,5 g = rand
+    var dx = Math.max(-18, Math.min(18, gt * scale));
+    var dy = Math.max(-18, Math.min(18, -gl * scale));
+    var dot = $('gdot'); dot.setAttribute('cx', (23 + dx).toFixed(1)); dot.setAttribute('cy', (23 + dy).toFixed(1));
+    var now = Date.now();
+    if (now - lastSlow > 250) {
+      lastSlow = now;
+      $('gval').textContent = fmt2(mag) + ' g';
+      var txt = 'rustig';
+      if (mag > 0.05) {
+        if (Math.abs(gt) > Math.abs(gl)) txt = 'bocht ' + (gt > 0 ? 'rechts' : 'links');
+        else txt = gl > 0 ? 'optrekken' : 'remmen';
+      }
+      $('gtxt').textContent = txt;
+      var d = new Date();
+      $('clock').textContent = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+      renderTrip();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- Scherm aan ----------
+  var wakeLock = null;
+  function keepAwake() {
+    if (!('wakeLock' in navigator)) return;
+    navigator.wakeLock.request('screen').then(function (l) { wakeLock = l; }).catch(function () {});
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') keepAwake();
+  });
+
+  // ---------- Start ----------
+  function startSensors() {
+    if ('geolocation' in navigator) {
+      navigator.geolocation.watchPosition(onPos, onPosErr, { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+    } else { onPosErr({ code: 0 }); }
+    window.addEventListener('devicemotion', onMotion);
+    if ('ondeviceorientationabsolute' in window) window.addEventListener('deviceorientationabsolute', onOrient);
+    else window.addEventListener('deviceorientation', onOrient);
+    keepAwake();
+  }
+  $('btnStart').addEventListener('click', function () {
+    var asks = [];
+    if (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === 'function') asks.push(DeviceMotionEvent.requestPermission().catch(function () {}));
+    if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') asks.push(DeviceOrientationEvent.requestPermission().catch(function () {}));
+    Promise.all(asks).then(function () {
+      $('start').hidden = true;
+      startSensors();
+    });
+  });
+
+  applyColor(false);
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
