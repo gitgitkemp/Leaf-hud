@@ -96,6 +96,14 @@ body { touch-action: none; }
 .rb[aria-pressed="true"] { border-color: var(--accent); background: var(--panel); color: var(--accent); }
 .rb svg { stroke: currentColor; }
 .rb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.rb .p { font-size: 15px; font-weight: 700; line-height: 1; }
+.tile.park { flex-direction: row; align-items: center; gap: 14px; position: relative; }
+.tile.park .k, .tile.park .v { white-space: nowrap; }
+.parrow { width: 56px; height: 56px; flex: none; transition: transform .2s linear; }
+.parrow path { fill: var(--accent); }
+.tile.park .txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; padding-right: 30px; }
+.clear { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; padding: 0; font: inherit; font-size: 16px; line-height: 1; color: var(--muted); background: transparent; border: 1px solid var(--tick); border-radius: 999px; cursor: pointer; }
+@media (prefers-reduced-motion: reduce) { .parrow { transition: none; } }
 
 /* Staand */
 @media (orientation: portrait) {
@@ -161,6 +169,15 @@ body { touch-action: none; }
           <span class="s" id="gtxt">rustig</span>
         </div>
       </div>
+      <div class="tile park" id="parkTile" hidden>
+        <svg class="parrow" id="parrow" viewBox="0 0 56 56" aria-hidden="true"><path d="M28 4 L44 46 L28 37 L12 46 Z"></path></svg>
+        <div class="txt">
+          <span class="k">Naar je auto</span>
+          <span class="v" id="pdist">-- m</span>
+          <span class="s" id="pinfo">geparkeerd</span>
+        </div>
+        <button class="clear" id="btnClearPark" type="button" aria-label="Parkeerplek wissen">×</button>
+      </div>
       <div class="tile" id="energyTile" hidden>
         <span class="k">Rit-energie</span>
         <span class="v" id="ekwh">≈ 0,0 kWh</span>
@@ -176,6 +193,7 @@ body { touch-action: none; }
     </div>
     <div class="right">
       <span class="trip" id="trip" title="Houd 1 seconde vast om de rit te resetten"><span id="tTime">0:00</span><span class="sep">·</span><span id="tDist">0,0 km</span><span class="sep">·</span><span id="tAvg">⌀ 0 km/u</span></span>
+      <button class="rb" id="btnPark" type="button" aria-pressed="false" aria-label="Parkeerplek opslaan of tonen. Vasthouden slaat een nieuwe plek op."><span class="p">P</span></button>
       <button class="rb" id="btnSmooth" type="button" aria-pressed="true" aria-label="Vloeiende snelheid aan of uit">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12c2.5-5 5-5 7.5 0s5 5 7.5 0 3.5-3 5-3"></path></svg>
       </button>
@@ -351,6 +369,9 @@ body { touch-action: none; }
   // ---------- Toestand ----------
   var smoothOn = load('smooth', true);
   var energyOn = load('energy', false);
+  var curPos = null;
+  var park = load('park', null);
+  var parkShow = false;
   var gpsSpeed = null;        // km/u laatste fix
   var gpsAt = 0;              // ms
   var estSpeed = null;        // km/u geschat
@@ -406,6 +427,7 @@ body { touch-action: none; }
       if (sp > 2 && d < 500) { trip.dist += d; save('trip', trip); }
     }
     if (c.accuracy < 35 || !lastFix) lastFix = fix;
+    curPos = { lat: c.latitude, lon: c.longitude, acc: c.accuracy };
     gpsSpeed = sp; gpsAt = now; estSpeed = sp;
     gpsHeading = (c.heading !== null && !isNaN(c.heading) && sp > 8) ? c.heading : null;
     maybePlace(c.latitude, c.longitude);
@@ -502,6 +524,17 @@ body { touch-action: none; }
       heading = (heading + diff * 0.15 + 360) % 360;
       renderCompass(heading);
     }
+    // Parkeerplek
+    if (parkShow && park) {
+      if (curPos) {
+        var pd = hav(curPos, park);
+        $('pdist').textContent = pd < 1000 ? Math.round(pd / 5) * 5 + ' m' : (pd / 1000).toFixed(1).replace('.', ',') + ' km';
+        var brg = bearing(curPos, park);
+        var rot = ((brg - heading) % 360 + 360) % 360;
+        $('parrow').style.transform = 'rotate(' + rot.toFixed(0) + 'deg)';
+        if (pd < 15) $('pdist').textContent = 'Je bent er';
+      } else { $('pdist').textContent = 'GPS zoeken…'; }
+    }
     // G-kracht
     var gl = aLong / 9.81, gt = aLat / 9.81;
     var mag = Math.sqrt(gl * gl + gt * gt);
@@ -593,9 +626,54 @@ body { touch-action: none; }
     }
   }
 
+  // ---------- Parkeerplek ----------
+  function bearing(a, b) {
+    var toR = Math.PI / 180;
+    var y = Math.sin((b.lon - a.lon) * toR) * Math.cos(b.lat * toR);
+    var x = Math.cos(a.lat * toR) * Math.sin(b.lat * toR) - Math.sin(a.lat * toR) * Math.cos(b.lat * toR) * Math.cos((b.lon - a.lon) * toR);
+    return (Math.atan2(y, x) / toR + 360) % 360;
+  }
+  function renderPark() {
+    $('btnPark').setAttribute('aria-pressed', park ? 'true' : 'false');
+    $('parkTile').hidden = !(parkShow && park);
+    if (park) {
+      var d = new Date(park.t);
+      $('pinfo').textContent = 'geparkeerd om ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    }
+  }
+  function savePark() {
+    if (!curPos) { toast('Nog geen GPS, probeer zo opnieuw'); return; }
+    park = { lat: curPos.lat, lon: curPos.lon, t: Date.now() };
+    save('park', park);
+    parkShow = false;
+    toast('Parkeerplek opgeslagen');
+    renderPark();
+  }
+  var parkHold = null, parkHeld = false;
+  function parkDown() {
+    parkHeld = false;
+    parkHold = setTimeout(function () { parkHeld = true; savePark(); }, 800);
+  }
+  function parkUp() { clearTimeout(parkHold); }
+  $('btnPark').addEventListener('touchstart', parkDown, { passive: true });
+  $('btnPark').addEventListener('touchend', parkUp);
+  $('btnPark').addEventListener('touchcancel', parkUp);
+  $('btnPark').addEventListener('mousedown', parkDown);
+  $('btnPark').addEventListener('mouseup', parkUp);
+  $('btnPark').addEventListener('click', function () {
+    if (parkHeld) { parkHeld = false; return; }
+    if (!park) { savePark(); return; }
+    parkShow = !parkShow;
+    renderPark();
+  });
+  $('btnClearPark').addEventListener('click', function () {
+    park = null; parkShow = false; save('park', null); renderPark(); toast('Parkeerplek gewist');
+  });
+  renderPark();
+
   // ---------- Automatisch updaten ----------
   // Haalt de nieuwste versie op langs de cache heen en herlaadt als er een nieuwe is.
-  var APP_VERSION = '6';
+  var APP_VERSION = '7';
   function checkUpdate() {
     fetch('./?nocache=' + Date.now(), { cache: 'no-store' })
       .then(function (r) { return r.ok ? r.text() : ''; })
