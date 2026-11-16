@@ -450,7 +450,7 @@ body { touch-action: none; }
   var lastPosT = 0;
   var lastFix = null;
   var aLong = 0, aLat = 0;    // gefilterd, m/s^2
-  var gSign = load('gsign', -1); // iPhone geeft de versnelling andersom
+  var gSign = load('gsign2', -1); // iPhone geeft de versnelling andersom
   var lastMotion = 0;
 
   function setBtn(id, on) { $(id).setAttribute('aria-pressed', on ? 'true' : 'false'); }
@@ -467,7 +467,7 @@ body { touch-action: none; }
   });
 
   $('gmeter').addEventListener('click', function () {
-    gSign = -gSign; save('gsign', gSign); aLong = 0; aLat = 0; toast('G-meter omgedraaid');
+    gSign = -gSign; save('gsign2', gSign); aLong = 0; aLat = 0; toast('G-meter omgedraaid');
   });
 
   // Rit resetten: 1 seconde vasthouden
@@ -548,7 +548,7 @@ body { touch-action: none; }
     if (!a || a.x === null) return;
     var ang = screenAngle();
     // Telefoon rechtop in houder, scherm naar bestuurder. Vooruit = van het scherm af = -z.
-    var lon = -(a.z || 0) * gSign;
+    var lon = (a.z || 0) * gSign; // voor/achter: getest in de auto, optrekken = +
     var lat;
     if (ang === 90) lat = -(a.y || 0);
     else if (ang === -90 || ang === 270) lat = (a.y || 0);
@@ -779,7 +779,7 @@ body { touch-action: none; }
   });
   renderHelpBtn();
 
-  var APP_VERSION = '11';
+  var APP_VERSION = '12';
   function checkUpdate() {
     fetch('./?nocache=' + Date.now(), { cache: 'no-store' })
       .then(function (r) { return r.ok ? r.text() : ''; })
