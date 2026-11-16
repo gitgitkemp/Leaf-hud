@@ -618,8 +618,9 @@ body { touch-action: none; }
     var gl = aLong / 9.81, gt = aLat / 9.81;
     var mag = Math.sqrt(gl * gl + gt * gt);
     var scale = 18 / 0.5; // 0,5 g = rand
-    var dx = Math.max(-18, Math.min(18, gt * scale));
-    var dy = Math.max(-18, Math.min(18, -gl * scale));
+    // Stip toont de kracht die je voelt: optrekken = naar achteren, remmen = naar voren, bocht rechts = naar links
+    var dx = Math.max(-18, Math.min(18, -gt * scale));
+    var dy = Math.max(-18, Math.min(18, gl * scale));
     var dot = $('gdot'); dot.setAttribute('cx', (23 + dx).toFixed(1)); dot.setAttribute('cy', (23 + dy).toFixed(1));
     var now = Date.now();
     if (now - lastSlow > 250) {
