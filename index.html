@@ -625,7 +625,9 @@ body { touch-action: none; }
     var now = Date.now();
     if (now - lastSlow > 250) {
       lastSlow = now;
-      $('gval').textContent = fmt2(mag) + ' g';
+      // Voor/achter met teken: optrekken +, remmen (of optrekken in z'n achteruit) -
+      var gShow = Math.abs(gl) >= Math.abs(gt) ? (gl < 0 ? -mag : mag) : mag;
+      $('gval').textContent = (gShow < -0.005 ? '-' : '') + fmt2(Math.abs(gShow)) + ' g';
       var txt = 'rustig';
       if (mag > 0.05) {
         if (Math.abs(gt) > Math.abs(gl)) txt = 'bocht ' + (gt > 0 ? 'rechts' : 'links');
