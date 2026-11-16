@@ -8,23 +8,27 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Leaf HUD">
 <meta name="theme-color" content="#050607">
+<meta name="description" content="Snelheid, kompas, G-kracht en ritinfo voor in de auto.">
 <title>Leaf HUD</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-/* Layout: kompasstreep boven, snelheid groot links/midden, G-kracht rechts, dunne ritregel onder. Staand: alles onder elkaar. */
+/* Layout: kompasstreep boven, snelheid groot links/midden, G-kracht rechts, ritregel onder. Staand: alles onder elkaar. */
 :root {
   --bg: #050607;
-  --panel: #0E1113;
-  --line: #1C2125;
-  --tick: #33393E;
-  --dim: #5C656B;
-  --muted: #9AA3A8;
-  --soft: #C9D0D4;
+  --panel: #0C0F11;
+  --line: #1A1F23;
+  --tick: #30373C;
+  --dim: #59626A;
+  --muted: #98A2A8;
   --fg: #F2F5F3;
-  --accent: #3DDC97;
-  --glow: rgba(61, 220, 151, 0.2);
+  --accent: #0058F3;
+  --glow: rgba(0, 88, 243, 0.28);
+  --ghost: rgba(255, 255, 255, 0.045);
   --font: 'Chakra Petch', 'DIN Alternate', 'Avenir Next Condensed', system-ui, sans-serif;
   color-scheme: dark;
 }
@@ -39,14 +43,22 @@ html, body {
   overscroll-behavior: none;
 }
 body { touch-action: none; }
+button { font: inherit; color: inherit; }
 .app {
   height: 100%;
   padding: max(12px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
   display: flex; flex-direction: column; gap: 6px;
+  background: radial-gradient(120% 80% at 35% 55%, var(--glow), transparent 60%) no-repeat, var(--bg);
+  background-size: 100% 100%;
 }
+/* HUD-stand: spiegelen voor weerspiegeling in de voorruit */
+.app.mirror { transform: scaleX(-1); background: #000; }
+.app.mirror .digits { filter: drop-shadow(0 0 26px var(--glow)) brightness(1.15); }
 
 /* Kompas */
-.compass { position: relative; height: 36px; flex: none; overflow: hidden; }
+.compass { position: relative; height: 38px; flex: none; overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+          mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); }
 .compass .mark { position: absolute; top: 0; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 3px; will-change: left; }
 .compass .tk { width: 1px; height: 6px; background: var(--tick); }
 .compass .mark.inter .tk { height: 8px; background: var(--dim); }
@@ -57,8 +69,9 @@ body { touch-action: none; }
 .compass .mark.north .lbl { color: var(--accent); }
 .compass .box {
   position: absolute; left: 50%; top: 0; transform: translateX(-50%);
-  height: 32px; padding: 0 12px; border: 1.5px solid var(--accent); border-radius: 8px; background: var(--bg);
-  display: flex; align-items: baseline; justify-content: center; gap: 6px; z-index: 2; line-height: 29px; white-space: nowrap;
+  height: 34px; min-width: 92px; padding: 0 12px; border: 1.5px solid var(--accent); border-radius: 9px; background: var(--bg);
+  box-shadow: 0 0 14px var(--glow);
+  display: flex; align-items: baseline; justify-content: center; gap: 6px; z-index: 2; line-height: 31px; white-space: nowrap;
 }
 .compass .box b { font-size: 19px; font-weight: 700; }
 .compass .box span { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -68,94 +81,108 @@ body { touch-action: none; }
 .speedwrap { display: flex; align-items: flex-end; justify-content: center; gap: 14px; min-width: 0; }
 .digits { display: flex; gap: 3%; filter: drop-shadow(0 0 18px var(--glow)); height: min(64vh, 250px); }
 .digits svg { height: 100%; width: auto; }
-.digits polygon { fill: transparent; }
+.digits polygon { fill: var(--ghost); transition: fill .08s linear; }
 .digits polygon.on { fill: var(--accent); }
 .unit { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding-bottom: 8px; }
 .unit .u { font-size: 24px; font-weight: 500; color: var(--muted); letter-spacing: 0.06em; }
 .mode {
-  font: inherit; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim);
+  font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim);
   background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; min-height: 30px; cursor: pointer;
 }
 .mode[aria-pressed="true"] { color: var(--accent); border-color: var(--tick); }
-.mode:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mode:focus-visible, .rb:focus-visible, .gmeter:focus-visible, .helpbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .side { display: flex; flex-direction: column; justify-content: center; gap: 10px; }
 .tile { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
-.gmeter { display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; }
-.gmeter .gv { display: flex; align-items: baseline; gap: 8px; font-variant-numeric: tabular-nums; }
-.gmeter .gv b { font-size: 22px; font-weight: 600; }
-.gmeter .gv span { font-size: 12px; color: var(--muted); }
 .tile .k { font-size: 11px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
 .tile .v { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .tile .s { font-size: 12px; color: var(--muted); }
-.gsvg { width: min(42vh, 160px); height: min(42vh, 160px); flex: none; }
-.gsvg .dot { fill: var(--accent); }
+
+/* G-meter */
+.gmeter { display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: 0; padding: 0; cursor: pointer; }
+.gsvg { width: min(44vh, 176px); height: min(44vh, 176px); flex: none; overflow: visible; }
+.gsvg .ring { fill: none; stroke: var(--tick); stroke-width: 1; }
+.gsvg .ring.in { stroke: var(--line); stroke-dasharray: 2 3; }
+.gsvg .ax { stroke: var(--line); stroke-width: 0.8; }
+.gsvg .rl { fill: var(--dim); font-size: 6px; font-family: var(--font); }
+.gsvg .trail { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; opacity: .35; }
+.gsvg .peak { fill: none; stroke: var(--accent); stroke-width: 1; opacity: .5; }
+.gsvg .dot { fill: var(--accent); filter: drop-shadow(0 0 4px var(--accent)); }
+.gsvg .cal { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; opacity: .55; transition: stroke-dashoffset .6s; }
+.gv { display: flex; align-items: baseline; gap: 8px; font-variant-numeric: tabular-nums; }
+.gv b { font-size: 22px; font-weight: 600; min-width: 4.4ch; text-align: right; }
+.gv span { font-size: 12px; color: var(--muted); min-width: 9ch; }
+.gpk { display: flex; gap: 10px; font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.gpk i { font-style: normal; color: var(--muted); }
 
 /* Onderregel */
 .bar { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 6px; border-top: 1px solid var(--line); font-size: 13px; font-variant-numeric: tabular-nums; }
 .bar .clock { font-weight: 600; color: var(--accent); }
 .bar .place { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; text-align: center; }
-.bar .right { display: flex; align-items: center; gap: 12px; }
+.bar .place.err { color: #E0A33A; }
+.bar .right { display: flex; align-items: center; gap: 10px; }
 .trip { display: flex; gap: 12px; white-space: nowrap; }
 .trip .sep { color: var(--dim); }
 .rb {
-  width: 32px; height: 32px; padding: 0; border-radius: 999px; border: 1px solid var(--tick); background: transparent;
+  width: 34px; height: 34px; padding: 0; border-radius: 999px; border: 1px solid var(--tick); background: transparent;
   display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--dim);
 }
 .rb[aria-pressed="true"] { border-color: var(--accent); background: var(--panel); color: var(--accent); }
-.rb svg { stroke: currentColor; }
-.rb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.rb svg { stroke: currentColor; fill: none; }
 .rb .p { font-size: 15px; font-weight: 700; line-height: 1; }
 .tile.park { flex-direction: row; align-items: center; gap: 14px; position: relative; }
 .tile.park .k, .tile.park .v { white-space: nowrap; }
 .parrow { width: 56px; height: 56px; flex: none; transition: transform .2s linear; }
 .parrow path { fill: var(--accent); }
 .tile.park .txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; padding-right: 30px; }
-.clear { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; padding: 0; font: inherit; font-size: 16px; line-height: 1; color: var(--muted); background: transparent; border: 1px solid var(--tick); border-radius: 999px; cursor: pointer; }
-@media (prefers-reduced-motion: reduce) { .parrow { transition: none; } }
+.clear { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; padding: 0; font-size: 16px; line-height: 1; color: var(--muted); background: transparent; border: 1px solid var(--tick); border-radius: 999px; cursor: pointer; }
 
 /* Staand */
 @media (orientation: portrait) {
-  .app { padding-top: max(40px, env(safe-area-inset-top)); gap: 22px; }
-  .main { grid-template-columns: 1fr; grid-template-rows: 1fr auto; gap: 22px; }
+  .app { padding-top: max(40px, env(safe-area-inset-top)); gap: 20px; background-position: 50% 30%; }
+  .main { grid-template-columns: 1fr; grid-template-rows: 1fr auto; gap: 20px; }
   .speedwrap { flex-direction: column; align-items: center; }
   .unit { align-items: center; padding: 0; }
   .digits { height: min(24vh, 46vw); }
-  .gsvg { width: min(30vh, 170px); height: min(30vh, 170px); }
+  .gsvg { width: min(30vh, 180px); height: min(30vh, 180px); }
   .bar { flex-direction: column; align-items: stretch; gap: 8px; }
   .bar .top { display: flex; justify-content: space-between; gap: 12px; }
   .bar .place { text-align: right; }
-  .compass .box { width: 70px; }
+  .bar .right { justify-content: space-between; }
 }
 @media (orientation: landscape) {
   .bar .top { display: contents; }
 }
+@media (orientation: landscape) and (max-height: 330px) {
+  .digits { height: 52vh; }
+  .gsvg { width: 40vh; height: 40vh; }
+  .gpk { display: none; }
+}
 
-/* Start en melding */
+/* Start, help en melding */
 .start {
   position: fixed; inset: 0; z-index: 20; background: var(--bg);
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 24px; text-align: center;
 }
-.start h1 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: 0.04em; }
-.start p { margin: 0; max-width: 34ch; color: var(--muted); font-size: 15px; line-height: 1.45; }
+.start h1 { margin: 0; font-size: 30px; font-weight: 700; letter-spacing: 0.08em; color: var(--accent); text-shadow: 0 0 18px var(--glow); }
+.start p { margin: 0; max-width: 36ch; color: var(--muted); font-size: 15px; line-height: 1.45; }
 .start button {
-  font: inherit; font-size: 18px; font-weight: 600; color: var(--bg); background: var(--accent);
-  border: 0; border-radius: 999px; padding: 14px 34px; cursor: pointer; min-height: 48px;
+  font-size: 18px; font-weight: 600; color: #fff; background: var(--accent);
+  border: 0; border-radius: 999px; padding: 14px 38px; cursor: pointer; min-height: 48px; box-shadow: 0 0 24px var(--glow);
 }
 .helpbtn {
   position: fixed; z-index: 5;
   top: calc(env(safe-area-inset-top, 0px) + 6px); left: calc(env(safe-area-inset-left, 0px) + 6px);
-  width: 26px; height: 26px; padding: 0; border-radius: 999px;
+  width: 28px; height: 28px; padding: 0; border-radius: 999px;
   border: 1px solid var(--tick); background: var(--bg); color: var(--dim);
-  font: inherit; font-size: 14px; font-weight: 700; line-height: 1; cursor: pointer;
+  font-size: 14px; font-weight: 700; line-height: 1; cursor: pointer;
 }
-.helpbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .help {
   position: fixed; inset: 0; z-index: 30; background: var(--bg);
   overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch;
   padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
 }
-.help .in { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+.help .in { max-width: 880px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
 .help h2 { margin: 0; font-size: 18px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
 .help dl { margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px 20px; }
 .help dl > div { display: grid; grid-template-columns: 22px minmax(0, 1fr); column-gap: 10px; align-items: start; }
@@ -164,17 +191,20 @@ body { touch-action: none; }
 .help dt { font-size: 13px; font-weight: 700; color: var(--fg); }
 .help dd { margin: 1px 0 0; font-size: 12px; line-height: 1.35; color: var(--muted); }
 .help .row { display: flex; flex-wrap: wrap; gap: 10px; padding-top: 6px; }
-.help .row button { font: inherit; font-size: 14px; font-weight: 600; border-radius: 999px; padding: 8px 16px; min-height: 40px; cursor: pointer; }
-.help .close { background: var(--accent); color: var(--bg); border: 0; }
-.help .hide { background: transparent; color: var(--muted); border: 1px solid var(--tick); }
+.help .row button { font-size: 14px; font-weight: 600; border-radius: 999px; padding: 8px 16px; min-height: 40px; cursor: pointer; }
+.help .close { background: var(--accent); color: #fff; border: 0; }
+.help .ghost { background: transparent; color: var(--muted); border: 1px solid var(--tick); }
 .help .note { margin: 0; font-size: 11px; color: var(--dim); }
 .toast {
-  position: fixed; left: 50%; bottom: calc(70px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+  position: fixed; left: 50%; bottom: calc(80px + env(safe-area-inset-bottom)); transform: translateX(-50%);
   background: var(--panel); border: 1px solid var(--accent); color: var(--fg); border-radius: 999px;
-  padding: 8px 18px; font-size: 15px; font-weight: 600; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 10;
+  padding: 8px 18px; font-size: 15px; font-weight: 600; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 40;
+  white-space: nowrap; max-width: calc(100vw - 32px); overflow: hidden; text-overflow: ellipsis;
 }
 .toast.show { opacity: 1; }
-@media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .toast, .parrow, .digits polygon, .gsvg .cal { transition: none; }
+}
 </style>
 </head>
 <body>
@@ -191,15 +221,21 @@ body { touch-action: none; }
     </div>
 
     <div class="side">
-      <button class="gmeter" id="gmeter" type="button" aria-label="G-kracht. Tik om de richting om te draaien.">
-        <svg class="gsvg" viewBox="0 0 46 46" aria-hidden="true">
-          <circle cx="23" cy="23" r="21" fill="none" stroke="#33393E" stroke-width="1.2"></circle>
-          <circle cx="23" cy="23" r="10" fill="none" stroke="#1C2125" stroke-width="1.2"></circle>
-          <line x1="23" y1="4" x2="23" y2="42" stroke="#1C2125" stroke-width="0.8"></line>
-          <line x1="4" y1="23" x2="42" y2="23" stroke="#1C2125" stroke-width="0.8"></line>
-          <circle class="dot" id="gdot" cx="23" cy="23" r="3.5"></circle>
+      <button class="gmeter" id="gmeter" type="button" aria-label="G-kracht. Tik: nulpunt en pieken resetten. Vasthouden: kalibratie opnieuw.">
+        <svg class="gsvg" viewBox="0 0 100 100" aria-hidden="true">
+          <circle class="ring" cx="50" cy="50" r="44"></circle>
+          <circle class="ring in" cx="50" cy="50" r="22"></circle>
+          <line class="ax" x1="50" y1="4" x2="50" y2="96"></line>
+          <line class="ax" x1="4" y1="50" x2="96" y2="50"></line>
+          <text class="rl" x="52" y="27">0,25</text>
+          <text class="rl" x="52" y="5">0,5</text>
+          <circle class="cal" id="gcal" cx="50" cy="50" r="48" stroke-dasharray="301.6" stroke-dashoffset="301.6" transform="rotate(-90 50 50)"></circle>
+          <polyline class="trail" id="gtrail" points=""></polyline>
+          <circle class="peak" id="gpeak" cx="50" cy="50" r="3.5" hidden></circle>
+          <circle class="dot" id="gdot" cx="50" cy="50" r="5"></circle>
         </svg>
         <span class="gv"><b id="gval">0,00 g</b><span id="gtxt">rustig</span></span>
+        <span class="gpk" id="gpk"><span>op <i id="pkA">0,00</i></span><span>rem <i id="pkB">0,00</i></span><span>bocht <i id="pkL">0,00</i></span></span>
       </button>
       <div class="tile park" id="parkTile" hidden>
         <svg class="parrow" id="parrow" viewBox="0 0 56 56" aria-hidden="true"><path d="M28 4 L44 46 L28 37 L12 46 Z"></path></svg>
@@ -227,7 +263,10 @@ body { touch-action: none; }
       <span class="trip" id="trip" title="Houd 1 seconde vast om de rit te resetten"><span id="tTime">0:00</span><span class="sep">·</span><span id="tDist">0,0 km</span><span class="sep">·</span><span id="tAvg">⌀ 0 km/u</span></span>
       <button class="rb" id="btnPark" type="button" aria-pressed="false" aria-label="Parkeerplek opslaan of tonen. Vasthouden slaat een nieuwe plek op."><span class="p">P</span></button>
       <button class="rb" id="btnEnergy" type="button" aria-pressed="false" aria-label="Rit-energie tonen of verbergen">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"></path></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"></path></svg>
+      </button>
+      <button class="rb" id="btnMirror" type="button" aria-pressed="false" aria-label="HUD-stand: beeld spiegelen voor de voorruit">
+        <svg width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18"></path><path d="M8 7 3 12l5 5z"></path><path d="M16 7l5 5-5 5z"></path></svg>
       </button>
     </div>
   </div>
@@ -239,24 +278,26 @@ body { touch-action: none; }
   <div class="in">
     <h2 id="helpTitle">Zo werkt je HUD</h2>
     <dl>
-      <div><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17a8 8 0 1 1 16 0"></path><path d="M12 17l4-5"></path></svg><dt>Snelheid</dt><dd>Van je GPS, ±1 keer per seconde. Cijfers staan op een vaste plek. Een streepje: nog geen GPS.</dd></div>
+      <div><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17a8 8 0 1 1 16 0"></path><path d="M12 17l4-5"></path></svg><dt>Snelheid</dt><dd>Van je GPS, ±1 keer per seconde. Een streepje: nog geen GPS.</dd></div>
       <div><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12c2.5-5 5-5 7.5 0s5 5 7.5 0 3.5-3 5-3"></path></svg><dt>Vloeiend of alleen GPS</dt><dd>Tik op het label onder km/u. Vloeiend vult de snelheid aan met de bewegingssensor tussen twee GPS-metingen.</dd></div>
-      <div><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M15 9l-2 4-4 2 2-4z"></path></svg><dt>Kompas</dt><dd>Alle 8 richtingen in de streep bovenin, jouw richting in het kader. Rijdend GPS-koers, stilstaand het telefoonkompas.</dd></div>
-      <div><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="4"></circle><circle cx="14" cy="9" r="1.5"></circle></svg><dt>G-kracht</dt><dd>Bolletje beweegt bij optrekken, remmen en bochten. Rand is 0,5 g. Verkeerd om? Tik op de meter.</dd></div>
+      <div><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M15 9l-2 4-4 2 2-4z"></path></svg><dt>Kompas</dt><dd>Rijdend GPS-koers, stilstaand het telefoonkompas. Tijdens het rijden leert het kompas hoe je telefoon in de houder zit.</dd></div>
+      <div><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="4"></circle><circle cx="12" cy="16" r="1.5"></circle></svg><dt>G-kracht</dt><dd>Bolletje toont wat je voelt: optrekken omlaag, remmen omhoog, bocht rechts naar links. Binnenste ring 0,25 g, rand 0,5 g.</dd></div>
+      <div><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9"></path><path d="M12 7v5l3 2"></path></svg><dt>Zelfkalibratie</dt><dd>Houder scheef of telefoon gekanteld? Maakt niet uit. De meter vergelijkt zich met je GPS en stelt zich bij. Het ringetje eromheen loopt vol.</dd></div>
+      <div><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v4M12 18v4M2 12h4M18 12h4"></path></svg><dt>Nulpunt</dt><dd>Tik op de meter als je stilstaat: nulpunt en pieken resetten. Vasthouden: kalibratie helemaal opnieuw.</dd></div>
       <div><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="18" r="2"></circle><circle cx="18" cy="6" r="2"></circle><path d="M8 18h7a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7"></path></svg><dt>Ritregel</dt><dd>Rijtijd, km en gemiddelde (alleen als je rijdt). Na 2 uur stilstand begint een nieuwe rit. Vasthouden: reset.</dd></div>
-      <div><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"></path></svg><dt>Rit-energie</dt><dd>Schatting van kWh en kosten (0,21 kWh/km, €0,54/kWh). Staat standaard uit.</dd></div>
+      <div><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"></path></svg><dt>Rit-energie</dt><dd>Schatting van kWh en kosten (0,17 tot 0,22 kWh/km, hoger bij hoge snelheid). Staat standaard uit.</dd></div>
       <div><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="8"></rect><text x="12" y="16.5" text-anchor="middle">P</text></svg><dt>Parkeerplek</dt><dd>Tik: plek opslaan, daarna pijl en afstand naar je auto. Vasthouden: nieuwe plek. Kruisje: wissen.</dd></div>
+      <div><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18"></path><path d="M8 7 3 12l5 5z"></path><path d="M16 7l5 5-5 5z"></path></svg><dt>HUD-stand</dt><dd>Spiegelt het beeld. Leg de telefoon plat op het dashboard, bovenkant naar jou toe, dan zie je hem in de voorruit.</dd></div>
       <div><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c4 5 6 8 6 11a6 6 0 0 1-12 0c0-3 2-6 6-11z"></path></svg><dt>Kleuren</dt><dd>Vanaf 07:00 vanzelf blauw, vanaf 17:30 donkerrood. Veeg omhoog of omlaag om tussendoor te wisselen.</dd></div>
       <div><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6-6-6-11a6 6 0 0 1 12 0c0 5-6 11-6 11z"></path><circle cx="12" cy="10" r="2"></circle></svg><dt>Straatnaam</dt><dd>Via OpenStreetMap, ±elke 30 s. Je positie gaat daarvoor naar OpenStreetMap.</dd></div>
       <div><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><circle cx="12" cy="12" r="8" stroke-dasharray="3 3"></circle></svg><dt>Toestemming</dt><dd>Na openen 1 tik op het scherm voor kompas en G-kracht. Dat eist je iPhone. Scherm blijft aan.</dd></div>
-      <div><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7"></path><path d="M20 4v5h-5"></path></svg><dt>Updates</dt><dd>Bij openen haalt de app zelf de nieuwste versie op.</dd></div>
       <div><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z"></path></svg><dt>Veilig</dt><dd>Alleen bedienen als je stilstaat, telefoon vast in een houder.</dd></div>
     </dl>
     <div class="row">
       <button class="close" id="btnHelpClose" type="button">Sluiten</button>
-      <button class="hide" id="btnHelpHide" type="button">Verberg help-knop</button>
+      <button class="ghost" id="btnHelpHide" type="button">Verberg help-knop</button>
     </div>
-    <p class="note">Verborgen? Tik 5 keer snel op je snelheid om de knop terug te halen.</p>
+    <p class="note">Verborgen? Tik 5 keer snel op je snelheid om de knop terug te halen. Versie <span id="ver"></span>.</p>
   </div>
 </div>
 
@@ -266,15 +307,167 @@ body { touch-action: none; }
   <h1>LEAF HUD</h1>
   <p>Zet je telefoon vast in de houder en tik op Start. Geef toegang tot je locatie en beweging, anders werken snelheid, kompas en G-kracht niet.</p>
   <button type="button" id="btnStart">Start</button>
-  <p style="font-size:13px">Veeg omhoog of omlaag om van kleur te wisselen. Houd de ritregel 1 seconde vast om je rit te resetten.</p>
+  <p style="font-size:13px">De G-meter stelt zich vanzelf af tijdens de eerste paar kilometer. Even optrekken en remmen op een rechte weg helpt.</p>
 </div>
+
+<script>
+// ==== MOTION-CORE START
+// Rekenkern voor de G-meter. Los van de pagina zodat tests/motion.test.js hem kan controleren.
+// Assen volgens W3C DeviceMotion: x naar rechts over het scherm, y naar boven over het scherm, z uit het scherm.
+var MotionCore = (function () {
+  'use strict';
+  var G = 9.80665;
+  var CAL_MIN = 6;    // som van (dv/dt)^2 voordat de hoekkalibratie meetelt
+  var LCAL_MIN = 3;   // idem voor de controle links/rechts in bochten
+  var CAL_DECAY = 0.995;
+
+  function dot(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+  function add(a, b) { return [a[0] + b[0], a[1] + b[1], a[2] + b[2]]; }
+  function sub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
+  function mul(a, k) { return [a[0] * k, a[1] * k, a[2] * k]; }
+  function cross(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
+  function norm(a) { var l = Math.sqrt(dot(a, a)); return l > 1e-6 ? mul(a, 1 / l) : null; }
+  function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+  // Bovenkant van het beeld, in telefoonassen, per schermhoek.
+  function screenUp(angle) {
+    angle = ((Math.round(angle) % 360) + 360) % 360;
+    if (angle === 90) return [1, 0, 0];
+    if (angle === 180) return [0, -1, 0];
+    if (angle === 270) return [-1, 0, 0];
+    return [0, 1, 0];
+  }
+
+  // Rijrichting en rechts in telefoonassen, uit de echte 'omhoog'-richting.
+  // Rechtop in de houder: vooruit = van het scherm af (-z). Plat: bovenkant beeld (HUD: andersom).
+  function carFrame(up, angle, hud) {
+    var top = screenUp(angle);
+    var flat = Math.abs(up[2]) > 0.75;
+    var f0 = flat ? (hud ? mul(top, -1) : top) : [0, 0, -1];
+    var f = norm(sub(f0, mul(up, dot(f0, up))));
+    if (!f) return null;
+    return { fwd: f, right: cross(f, up), flat: flat };
+  }
+
+  // Draai (voor, opzij) over een hoek, zodat een scheve houder rechtgezet wordt.
+  function rotate(lon, lat, yaw) {
+    var c = Math.cos(yaw), s = Math.sin(yaw);
+    return [lon * c + lat * s, -lon * s + lat * c];
+  }
+
+  function Proc() {
+    this.s = 1;           // teken van de sensor (+1 volgens de standaard)
+    this.sVote = 0;
+    this.grav = null;     // zwaartekracht in sensortekens
+    this.flat = false;
+    this.rawLon = 0; this.rawLat = 0;
+    this.lon = 0; this.lat = 0;
+    this.accLon = 0; this.accLat = 0; this.accN = 0;
+    this.resetCal();
+  }
+  Proc.prototype.resetCal = function () {
+    this.cal = { x: 0, y: 0, w: 0 };
+    this.lcal = { x: 0, w: 0 };
+    this.bias = [0, 0];
+  };
+  Proc.prototype.exportCal = function () {
+    return { s: this.s, cal: this.cal, lcal: this.lcal, bias: this.bias };
+  };
+  Proc.prototype.importCal = function (o) {
+    this.resetCal();
+    if (!o) return;
+    if (o.s === 1 || o.s === -1) this.s = o.s;
+    if (o.cal) this.cal = { x: +o.cal.x || 0, y: +o.cal.y || 0, w: +o.cal.w || 0 };
+    if (o.lcal) this.lcal = { x: +o.lcal.x || 0, w: +o.lcal.w || 0 };
+    if (o.bias && o.bias.length === 2) this.bias = [+o.bias[0] || 0, +o.bias[1] || 0];
+  };
+  Proc.prototype.yaw = function () { return this.cal.w >= CAL_MIN ? Math.atan2(this.cal.y, this.cal.x) : 0; };
+  Proc.prototype.latSign = function () { return this.lcal.w >= LCAL_MIN && this.lcal.x < 0 ? -1 : 1; };
+  Proc.prototype.confidence = function () { return Math.min(1, this.cal.w / CAL_MIN); };
+
+  // a: versnelling zonder zwaartekracht [x,y,z] of null. ag: met zwaartekracht of null. dt in s.
+  Proc.prototype.sample = function (a, ag, angle, hud, dt) {
+    if (!a && !ag) return false;
+    dt = clamp(dt || 0.016, 0.001, 0.2);
+    var gm = a && ag ? sub(ag, a) : ag;
+    if (gm) {
+      var kg = this.grav ? 1 - Math.exp(-dt / (a ? 0.25 : 1.5)) : 1;
+      this.grav = this.grav ? add(this.grav, mul(sub(gm, this.grav), kg)) : gm.slice();
+    }
+    var lin = a || (this.grav ? sub(ag, this.grav) : null);
+    if (!lin) return false;
+
+    var upT, linT;
+    var up = this.grav ? norm(this.grav) : null;
+    if (up) {
+      // Teken van de sensor bepalen: echte 'omhoog' wijst ongeveer naar boven in beeld of uit het scherm.
+      var d = dot(up, norm(add(screenUp(angle), [0, 0, 1])));
+      if (Math.abs(d) > 0.5) {
+        this.sVote = clamp(this.sVote + (d > 0 ? dt : -dt), -1.5, 1.5);
+        if (this.sVote >= 1) this.s = 1; else if (this.sVote <= -1) this.s = -1;
+      }
+      upT = mul(up, this.s); linT = mul(lin, this.s);
+    } else {
+      upT = screenUp(angle); linT = lin; // geen zwaartekracht beschikbaar: neem rechtop aan
+    }
+    var fr = carFrame(upT, angle, hud);
+    if (!fr) return false;
+    this.flat = fr.flat;
+
+    var lon = dot(linT, fr.fwd), lat = dot(linT, fr.right);
+    var k = 1 - Math.exp(-dt / 0.15);
+    this.rawLon += (lon - this.rawLon) * k;
+    this.rawLat += (lat - this.rawLat) * k;
+    this.accLon += lon; this.accLat += lat; this.accN++;
+
+    var r = rotate(this.rawLon - this.bias[0], this.rawLat - this.bias[1], this.yaw());
+    this.lon = r[0];
+    this.lat = r[1] * this.latSign();
+    return true;
+  };
+
+  // Na elke GPS-meting: v0, v1 in m/s, dt in s, hRate koersverandering in graden/s (rechtsom +) of null.
+  Proc.prototype.gps = function (v0, v1, dt, hRate) {
+    var n = this.accN;
+    var mLon = n ? this.accLon / n - this.bias[0] : 0, mLat = n ? this.accLat / n - this.bias[1] : 0;
+    this.accLon = 0; this.accLat = 0; this.accN = 0;
+    if (n < 5 || !(dt >= 0.4 && dt <= 3) || v0 === null || v1 === null || v0 < 3 || v1 < 3) return;
+    var turning = hRate !== null && Math.abs(hRate) > 4;
+    if (!turning) {
+      var dv = (v1 - v0) / dt;
+      if (Math.abs(dv) < 0.4) return;
+      this.cal.x = this.cal.x * CAL_DECAY + mLon * dv;
+      this.cal.y = this.cal.y * CAL_DECAY + mLat * dv;
+      this.cal.w = this.cal.w * CAL_DECAY + dv * dv;
+    } else if (Math.abs(hRate) > 6 && (v0 + v1) / 2 > 5) {
+      var cent = (v0 + v1) / 2 * hRate * Math.PI / 180; // m/s^2, + = naar rechts
+      var r = rotate(mLon, mLat, this.yaw());
+      this.lcal.x = this.lcal.x * CAL_DECAY + r[1] * cent;
+      this.lcal.w = this.lcal.w * CAL_DECAY + cent * cent;
+    }
+  };
+
+  // Stilstand: nulpunt langzaam bijstellen.
+  Proc.prototype.standstill = function (dt) {
+    if (Math.abs(this.rawLon) > 1 || Math.abs(this.rawLat) > 1) return;
+    var k = 1 - Math.exp(-clamp(dt, 0, 0.2) / 3);
+    this.bias[0] += (this.rawLon - this.bias[0]) * k;
+    this.bias[1] += (this.rawLat - this.bias[1]) * k;
+  };
+  Proc.prototype.zero = function () { this.bias = [this.rawLon, this.rawLat]; };
+
+  return { G: G, Proc: Proc, carFrame: carFrame, screenUp: screenUp, rotate: rotate, CAL_MIN: CAL_MIN };
+})();
+// ==== MOTION-CORE END
+</script>
 
 <script>
 (function () {
   'use strict';
 
+  var APP_VERSION = '13';
+
   // ---------- Instellingen ----------
-  var KWH_PER_KM = 0.21;   // praktijkverbruik Leaf 40 kWh incl. laadverlies
   var PRICE_KWH = 0.54;    // publiek laden
   var COLORS = [
     { name: 'Groen', hex: '#3DDC97' },
@@ -283,29 +476,62 @@ body { touch-action: none; }
     { name: 'Donkerrood', hex: '#920000' },
     { name: 'Wit', hex: '#F2F5F3' }
   ];
+  var DAY_IDX = 1, NIGHT_IDX = 3;
   var DIRS = ['N', 'NO', 'O', 'ZO', 'Z', 'ZW', 'W', 'NW'];
+  var G = MotionCore.G;
+  var G_RIM = 0.5;          // g op de buitenrand
+  var R_RIM = 44;           // straal buitenrand in de SVG
 
-  // ---------- Opslag ----------
+  // ---------- Hulp ----------
   function load(k, d) { try { var v = localStorage.getItem('hud.' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } }
   function save(k, v) { try { localStorage.setItem('hud.' + k, JSON.stringify(v)); } catch (e) {} }
-
   var $ = function (id) { return document.getElementById(id); };
+  function pad2(n) { return String(n).padStart(2, '0'); }
+  function hhmm(d) { return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
+  function fmt1(n) { return n.toFixed(1).replace('.', ','); }
+  function fmt2(n) { return n.toFixed(2).replace('.', ','); }
+  function wrap180(d) { return ((d + 540) % 360) - 180; }
+  function wrap360(d) { return (d % 360 + 360) % 360; }
+  function setBtn(id, on) { $(id).setAttribute('aria-pressed', on ? 'true' : 'false'); }
+
+  // Vasthouden-of-tikken voor een element. onHold na ms, onTap anders.
+  function holdable(el, ms, onHold, onTap) {
+    var timer = null, held = false;
+    function down() { held = false; clearTimeout(timer); timer = setTimeout(function () { held = true; onHold(); }, ms); }
+    function up() { clearTimeout(timer); }
+    el.addEventListener('pointerdown', down);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+    el.addEventListener('pointerleave', up);
+    el.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    el.addEventListener('click', function (e) {
+      if (held) { held = false; e.preventDefault(); return; }
+      if (onTap) onTap(e);
+    });
+  }
+
+  var toastTimer = null;
+  function toast(t, ms) {
+    var el = $('toast'); el.textContent = t; el.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.classList.remove('show'); }, ms || 1400);
+  }
 
   // ---------- Kleuren ----------
-  var colorIdx = load('color', 0);
+  var colorIdx = load('color', DAY_IDX);
+  if (!(colorIdx >= 0 && colorIdx < COLORS.length)) colorIdx = DAY_IDX;
   function hexToRgba(h, a) {
     var n = parseInt(h.slice(1), 16);
     return 'rgba(' + (n >> 16 & 255) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',' + a + ')';
   }
-  function applyColor(showToast) {
+  function applyColor(announce) {
     var c = COLORS[colorIdx];
-    document.documentElement.style.setProperty('--accent', c.hex);
-    document.documentElement.style.setProperty('--glow', hexToRgba(c.hex, 0.2));
-    var meta = document.querySelector('meta[name="theme-color"]');
+    var root = document.documentElement.style;
+    root.setProperty('--accent', c.hex);
+    root.setProperty('--glow', hexToRgba(c.hex, c.hex === '#920000' ? 0.38 : 0.26));
     save('color', colorIdx);
+    if (announce) toast(c.name, 700);
   }
-  // Automatisch: vanaf 07:00 blauw, vanaf 17:30 donkerrood. Swipen kan, tot het volgende wisselmoment.
-  var DAY_IDX = 1, NIGHT_IDX = 3;
+  // Automatisch: vanaf 07:00 blauw, vanaf 17:30 donkerrood. Vegen kan, tot het volgende wisselmoment.
   function slotNow() { var d = new Date(), m = d.getHours() * 60 + d.getMinutes(); return m >= 420 && m < 1050 ? 'dag' : 'avond'; }
   function checkSchedule() {
     var sl = slotNow();
@@ -314,17 +540,10 @@ body { touch-action: none; }
     colorIdx = sl === 'dag' ? DAY_IDX : NIGHT_IDX;
     applyColor(false);
   }
-  var toastTimer = null;
-  function toast(t) {
-    var el = $('toast'); el.textContent = t; el.classList.add('show');
-    clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.classList.remove('show'); }, 900);
-  }
   function stepColor(dir) {
     colorIdx = (colorIdx + dir + COLORS.length) % COLORS.length;
     applyColor(true);
   }
-
-  // Swipen
   var ts = null;
   document.addEventListener('touchstart', function (e) {
     if (e.touches.length !== 1 || !$('help').hidden) { ts = null; return; }
@@ -334,18 +553,17 @@ body { touch-action: none; }
     if (!ts) return;
     var t = e.changedTouches[0];
     var dx = t.clientX - ts.x, dy = t.clientY - ts.y;
-    if (Math.abs(dy) > 50 && Math.abs(dy) > Math.abs(dx) * 1.5 && Date.now() - ts.t < 800) {
-      stepColor(dy < 0 ? 1 : -1);
-    }
+    if (Math.abs(dy) > 50 && Math.abs(dy) > Math.abs(dx) * 1.5 && Date.now() - ts.t < 800) stepColor(dy < 0 ? 1 : -1);
     ts = null;
   }, { passive: true });
-  // Desktop: pijltjes of scrollwiel
   document.addEventListener('keydown', function (e) {
+    if (!$('help').hidden) return;
     if (e.key === 'ArrowUp') stepColor(1);
     if (e.key === 'ArrowDown') stepColor(-1);
   });
   var wheelLock = 0;
   document.addEventListener('wheel', function (e) {
+    if (!$('help').hidden) return;
     var now = Date.now(); if (now - wheelLock < 400 || Math.abs(e.deltaY) < 20) return;
     wheelLock = now; stepColor(e.deltaY > 0 ? -1 : 1);
   }, { passive: true });
@@ -371,7 +589,7 @@ body { touch-action: none; }
       svg.setAttribute('aria-hidden', 'true');
       var g = document.createElementNS(NS, 'g');
       g.setAttribute('transform', 'translate(6 0) skewX(-5)');
-      var segs = {};
+      var segs = { svg: svg };
       Object.keys(SEG).forEach(function (k) {
         var p = document.createElementNS(NS, 'polygon');
         p.setAttribute('points', SEG[k]);
@@ -388,19 +606,20 @@ body { touch-action: none; }
     for (var i = 0; i < 3; i++) {
       var on = MAP[str[i]] || '';
       var segs = digitEls[i];
-      for (var k in segs) segs[k].classList.toggle('on', on.indexOf(k) >= 0);
-      if (i === 0) segs.a.ownerSVGElement.style.display = str[0] === ' ' ? 'none' : '';
+      for (var k in SEG) segs[k].classList.toggle('on', on.indexOf(k) >= 0);
+      // Honderdtal alleen tonen boven 99, maar de plek blijft vrij zodat de cijfers niet verspringen
+      segs.svg.style.visibility = i === 0 && str[0] === ' ' ? 'hidden' : '';
     }
-    $('digits').setAttribute('aria-label', str.trim() === '-' || str.trim() === '' ? 'Snelheid onbekend' : str.trim() + ' km/u');
+    var t = str.trim();
+    $('digits').setAttribute('aria-label', t === '-' || t === '' ? 'Snelheid onbekend' : t + ' km/u');
   }
   showSpeed('  -');
 
   // ---------- Kompas ----------
   var marks = [];
+  var compassEl = $('compass'), boxEl = compassEl.querySelector('.box');
   (function buildCompass() {
-    var c = $('compass');
     for (var i = 0; i < 16; i++) {
-      var deg = i * 22.5;
       var m = document.createElement('div');
       m.className = 'mark';
       var tk = document.createElement('div'); tk.className = 'tk'; m.appendChild(tk);
@@ -410,121 +629,253 @@ body { touch-action: none; }
         if (name === 'N') m.classList.add('north');
         var l = document.createElement('div'); l.className = 'lbl'; l.textContent = name; m.appendChild(l);
       }
-      c.insertBefore(m, c.firstChild);
-      marks.push({ el: m, deg: deg });
+      compassEl.insertBefore(m, compassEl.firstChild);
+      marks.push({ el: m, deg: i * 22.5 });
     }
   })();
-  var shownHeading = null;
+  var shownHeading = null, compassW = 0, boxHalf = 0;
+  function measureCompass() { compassW = compassEl.clientWidth || 800; boxHalf = (boxEl.offsetWidth || 92) / 2 + 16; shownHeading = null; }
+  window.addEventListener('resize', measureCompass);
   function renderCompass(h) {
-    var hr = Math.round(h) % 360;
-    if (hr === shownHeading) return;
-    shownHeading = hr;
-    var cw = $('compass').clientWidth || 800;
-    var half = ($('compass').querySelector('.box').offsetWidth || 88) / 2 + 16;
+    var key = Math.round(h * 2) / 2;
+    if (key === shownHeading) return;
+    shownHeading = key;
+    if (!compassW) measureCompass();
     for (var i = 0; i < marks.length; i++) {
-      var rel = ((marks[i].deg - h + 540) % 360) - 180;
-      var px = rel / 360 * cw;
+      var rel = wrap180(marks[i].deg - h);
+      var px = rel / 360 * compassW;
       marks[i].el.style.left = (50 + rel / 360 * 100) + '%';
-      marks[i].el.style.visibility = Math.abs(px) < half || Math.abs(px) > cw / 2 - 12 ? 'hidden' : 'visible';
+      marks[i].el.style.visibility = Math.abs(px) < boxHalf ? 'hidden' : 'visible';
     }
-    $('dirName').textContent = DIRS[Math.round(hr / 45) % 8];
+    var hr = Math.round(h) % 360, dn = DIRS[Math.round(hr / 45) % 8];
+    $('dirName').textContent = dn;
     $('dirDeg').textContent = hr + '°';
-    $('compass').setAttribute('aria-label', 'Richting ' + hr + ' graden, ' + DIRS[Math.round(hr / 45) % 8]);
+    compassEl.setAttribute('aria-label', 'Richting ' + hr + ' graden, ' + dn);
   }
-  renderCompass(0);
 
   // ---------- Toestand ----------
   var smoothOn = load('smooth', true);
   var energyOn = load('energy', false);
+  var mirrorOn = load('mirror', false);
   var curPos = null;
   var park = load('park', null);
   var parkShow = false;
-  var gpsSpeed = null;        // km/u laatste fix
+  var gpsSpeed = null;        // km/u laatste meting
   var gpsAt = 0;              // ms
   var estSpeed = null;        // km/u geschat
-  var gpsHeading = null;
-  var magHeading = null;
-  var heading = 0;
+  var gpsHeading = null;      // graden, alleen als je rijdt
+  var gpsHeadingAt = 0;
+  var magRaw = null;          // ruw telefoonkompas
+  var heading = 0, headingKnown = false;
+  var stillSince = 0;
+  var newTrip = function () { return { dist: 0, mov: 0, kwh: 0, start: Date.now(), last: Date.now() }; };
   var trip = load('trip', null);
-  if (!trip || typeof trip.mov !== 'number' || (trip.last && Date.now() - trip.last > 7200000)) trip = { dist: 0, mov: 0, start: Date.now(), last: Date.now() };
-  var lastPosT = 0;
-  var lastFix = null;
-  var aLong = 0, aLat = 0;    // gefilterd, m/s^2
-  var gSign = load('gsign2', -1); // iPhone geeft de versnelling andersom
-  var lastMotion = 0;
+  if (!trip || typeof trip.mov !== 'number' || (trip.last && Date.now() - trip.last > 7200000)) trip = newTrip();
+  if (typeof trip.kwh !== 'number') trip.kwh = trip.dist / 1000 * 0.19;
+  var lastPosT = 0, lastFix = null, prevGps = null;
 
-  function setBtn(id, on) { $(id).setAttribute('aria-pressed', on ? 'true' : 'false'); }
-  setBtn('btnSmooth', smoothOn); setBtn('btnEnergy', energyOn);
-  $('energyTile').hidden = !energyOn;
-  $('mode').textContent = smoothOn ? 'vloeiend' : 'alleen GPS';
-  $('btnSmooth').addEventListener('click', function () {
-    smoothOn = !smoothOn; save('smooth', smoothOn); setBtn('btnSmooth', smoothOn);
-    $('mode').textContent = smoothOn ? 'vloeiend' : 'alleen GPS';
-  });
-  $('btnEnergy').addEventListener('click', function () {
-    energyOn = !energyOn; save('energy', energyOn); setBtn('btnEnergy', energyOn);
+  $('ver').textContent = APP_VERSION;
+  function renderToggles() {
+    setBtn('btnSmooth', smoothOn); setBtn('btnEnergy', energyOn); setBtn('btnMirror', mirrorOn);
     $('energyTile').hidden = !energyOn;
+    $('mode').textContent = smoothOn ? 'vloeiend' : 'alleen GPS';
+    $('app').classList.toggle('mirror', mirrorOn);
+  }
+  renderToggles();
+  $('btnSmooth').addEventListener('click', function () { smoothOn = !smoothOn; save('smooth', smoothOn); renderToggles(); });
+  $('btnEnergy').addEventListener('click', function () { energyOn = !energyOn; save('energy', energyOn); renderToggles(); });
+  $('btnMirror').addEventListener('click', function () {
+    mirrorOn = !mirrorOn; save('mirror', mirrorOn); renderToggles(); useMountCal();
+    toast(mirrorOn ? 'HUD-stand: telefoon plat, bovenkant naar jou' : 'Gewone stand', 2200);
   });
 
-  $('gmeter').addEventListener('click', function () {
-    gSign = -gSign; save('gsign2', gSign); aLong = 0; aLat = 0; toast('G-meter omgedraaid');
+  holdable($('trip'), 1000, function () {
+    trip = newTrip(); save('trip', trip); lastFix = null; toast('Rit gereset'); renderTrip();
   });
 
-  // Rit resetten: 1 seconde vasthouden
-  var holdTimer = null;
-  function startHold() { holdTimer = setTimeout(function () { trip = { dist: 0, mov: 0, start: Date.now(), last: Date.now() }; save('trip', trip); lastFix = null; toast('Rit gereset'); renderTrip(); }, 1000); }
-  function endHold() { clearTimeout(holdTimer); }
-  $('trip').addEventListener('touchstart', startHold, { passive: true });
-  $('trip').addEventListener('touchend', endHold);
-  $('trip').addEventListener('touchcancel', endHold);
-  $('trip').addEventListener('mousedown', startHold);
-  $('trip').addEventListener('mouseup', endHold);
+  // ---------- G-meter: verwerking en kalibratie ----------
+  var proc = new MotionCore.Proc();
+  var calStore = load('gcal', {});
+  if (!calStore || typeof calStore !== 'object') calStore = {};
+  var mountKey = null, calDirty = false;
+  function screenAngle() {
+    var a = screen.orientation && typeof screen.orientation.angle === 'number' ? screen.orientation.angle
+      : typeof window.orientation === 'number' ? window.orientation : 0;
+    return wrap360(a);
+  }
+  // Elke manier van vastzetten (rechtop/plat, schermhoek, HUD) heeft zijn eigen kalibratie.
+  function currentMountKey() { return (proc.flat ? 'plat' : 'rechtop') + screenAngle() + (mirrorOn ? 'hud' : ''); }
+  function storeCal() { if (mountKey) { calStore[mountKey] = proc.exportCal(); save('gcal', calStore); } calDirty = false; }
+  function useMountCal() {
+    var k = currentMountKey();
+    if (k === mountKey) return;
+    if (mountKey) storeCal();
+    mountKey = k;
+    var s = proc.s;
+    proc.importCal(calStore[k]);
+    if (!calStore[k]) proc.s = s; // sensorteken hoort bij de telefoon, niet bij de houder
+  }
+  setInterval(function () { if (calDirty) storeCal(); }, 10000);
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden' && calDirty) storeCal(); });
+
+  var peaks = { a: 0, b: 0, l: 0 };
+  function resetPeaks() { peaks = { a: 0, b: 0, l: 0 }; renderPeaks(); }
+  function renderPeaks() {
+    $('pkA').textContent = fmt2(peaks.a); $('pkB').textContent = fmt2(peaks.b); $('pkL').textContent = fmt2(peaks.l);
+  }
+  holdable($('gmeter'), 900, function () {
+    proc.resetCal(); storeCal(); resetPeaks(); trail = [];
+    toast('G-meter kalibreert opnieuw', 1800);
+  }, function () {
+    var moving = gpsSpeed !== null && gpsSpeed > 3 && Date.now() - gpsAt < 3000;
+    if (!moving) { proc.zero(); calDirty = true; }
+    resetPeaks();
+    toast(moving ? 'Pieken gereset' : 'Nulpunt en pieken gereset');
+  });
+
+  var lastMotion = 0;
+  function vec(o) { return o && typeof o.x === 'number' ? [o.x, o.y || 0, o.z || 0] : null; }
+  function onMotion(e) {
+    var now = performance.now();
+    var dt = lastMotion ? (now - lastMotion) / 1000 : (e.interval > 1 ? e.interval / 1000 : e.interval || 0.016);
+    lastMotion = now;
+    if (!proc.sample(vec(e.acceleration), vec(e.accelerationIncludingGravity), screenAngle(), mirrorOn, dt)) return;
+    useMountCal();
+    var gpsFresh = gpsSpeed !== null && Date.now() - gpsAt < 3000;
+    if (gpsFresh && gpsSpeed < 1 && stillSince && Date.now() - stillSince > 3000) { proc.standstill(dt); calDirty = true; }
+    // Vloeiende snelheid tussen twee GPS-metingen
+    if (smoothOn && estSpeed !== null && dt > 0 && dt < 0.2 && Date.now() - gpsAt < 2500 && gpsSpeed > 2) {
+      estSpeed = Math.max(0, estSpeed + proc.lon * dt * 3.6);
+      estSpeed = Math.min(Math.max(estSpeed, gpsSpeed - 6), gpsSpeed + 6);
+    }
+    if (gpsFresh && gpsSpeed > 5) {
+      var gl = proc.lon / G, gt = Math.abs(proc.lat / G);
+      if (gl > peaks.a) peaks.a = gl;
+      if (-gl > peaks.b) peaks.b = -gl;
+      if (gt > peaks.l) peaks.l = gt;
+    }
+  }
+
+  // ---------- Kompas uit telefoon ----------
+  // Android: richting van de rijrichting uit alpha/beta/gamma (werkt rechtop en plat).
+  function headingFromEuler(al, be, ga, angle) {
+    var r = Math.PI / 180, ca = Math.cos(al * r), sa = Math.sin(al * r), cb = Math.cos(be * r), sb = Math.sin(be * r), cg = Math.cos(ga * r), sg = Math.sin(ga * r);
+    // Kolommen van de rotatiematrix: telefoonassen in (oost, noord, omhoog)
+    var X = [ca * cg - sa * sb * sg, cg * sa + ca * sb * sg, -cb * sg];
+    var Y = [-cb * sa, ca * cb, sb];
+    var Z = [cg * sa * sb + ca * sg, sa * sg - ca * cg * sb, cb * cg];
+    var v;
+    if (Math.abs(Z[2]) < 0.75) v = [-Z[0], -Z[1]]; // rechtop: achterkant wijst vooruit
+    else {
+      var t = MotionCore.screenUp(angle);
+      v = [t[0] * X[0] + t[1] * Y[0], t[0] * X[1] + t[1] * Y[1]];
+      if (mirrorOn) v = [-v[0], -v[1]];
+    }
+    return wrap360(Math.atan2(v[0], v[1]) / r);
+  }
+  function onOrient(e) {
+    var h = null;
+    if (typeof e.webkitCompassHeading === 'number' && !isNaN(e.webkitCompassHeading) && e.webkitCompassHeading >= 0) {
+      h = e.webkitCompassHeading + screenAngle() + (mirrorOn && proc.flat ? 180 : 0);
+    } else if ((e.absolute || e.type === 'deviceorientationabsolute') && typeof e.alpha === 'number' && typeof e.beta === 'number') {
+      h = headingFromEuler(e.alpha, e.beta, e.gamma || 0, screenAngle());
+    }
+    if (h !== null) magRaw = wrap360(h);
+  }
+  // Tijdens het rijden leert het kompas het verschil met de GPS-koers (scheve houder, iPhone-eigenaardigheden).
+  var compOff = load('compOff', {});
+  if (!compOff || typeof compOff !== 'object') compOff = {};
+  function compKey() { return screenAngle() + (mirrorOn ? 'hud' : ''); }
+  function learnCompass() {
+    if (magRaw === null || gpsHeading === null || gpsSpeed < 15) return;
+    var k = compKey(), o = compOff[k] || { x: 0, y: 0 };
+    var d = wrap180(gpsHeading - magRaw) * Math.PI / 180;
+    o.x += (Math.cos(d) - o.x) * 0.03; o.y += (Math.sin(d) - o.y) * 0.03;
+    compOff[k] = o;
+  }
+  setInterval(function () { save('compOff', compOff); }, 15000);
+  function magHeading() {
+    if (magRaw === null) return null;
+    var o = compOff[compKey()];
+    if (o && Math.sqrt(o.x * o.x + o.y * o.y) > 0.6) return wrap360(magRaw + Math.atan2(o.y, o.x) * 180 / Math.PI);
+    return magRaw;
+  }
 
   // ---------- GPS ----------
   function hav(a, b) {
     var R = 6371000, toR = Math.PI / 180;
     var dLat = (b.lat - a.lat) * toR, dLon = (b.lon - a.lon) * toR;
     var s = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(a.lat * toR) * Math.cos(b.lat * toR) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    return 2 * R * Math.asin(Math.sqrt(s));
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
   }
+  function bearing(a, b) {
+    var toR = Math.PI / 180;
+    var y = Math.sin((b.lon - a.lon) * toR) * Math.cos(b.lat * toR);
+    var x = Math.cos(a.lat * toR) * Math.sin(b.lat * toR) - Math.sin(a.lat * toR) * Math.cos(b.lat * toR) * Math.cos((b.lon - a.lon) * toR);
+    return wrap360(Math.atan2(y, x) / toR);
+  }
+  // Verbruik Leaf 40 kWh incl. laadverlies, oplopend met snelheid (luchtweerstand).
+  function kwhPerKm(kmh) { return kmh < 60 ? 0.17 : kmh < 100 ? 0.17 + (kmh - 60) * 0.0008 : 0.202 + Math.min(kmh - 100, 40) * 0.0012; }
+
+  var placeEl = $('place');
+  function setPlace(t, err) { placeEl.textContent = t; placeEl.classList.toggle('err', !!err); placeEl.dataset.err = err ? '1' : ''; }
   function onPos(p) {
     var c = p.coords, now = Date.now();
+    var t = p.timestamp || now;
+    var fix = { lat: c.latitude, lon: c.longitude, t: t };
     var sp = c.speed;
-    var fix = { lat: c.latitude, lon: c.longitude, t: p.timestamp || now };
     if ((sp === null || isNaN(sp) || sp < 0) && lastFix) {
-      var dt = (fix.t - lastFix.t) / 1000;
-      sp = dt > 0 ? hav(lastFix, fix) / dt : 0;
+      var dts = (fix.t - lastFix.t) / 1000;
+      sp = dts > 0 ? hav(lastFix, fix) / dts : 0;
     }
-    sp = Math.max(0, (sp || 0) * 3.6);
-    if (lastFix && c.accuracy < 50) {
+    var ms = Math.max(0, sp || 0);
+    sp = ms * 3.6;
+    var good = c.accuracy < 50;
+    if (lastFix && good) {
       var d = hav(lastFix, fix);
-      if (sp > 2 && d < 500) trip.dist += d;
+      if (sp > 2 && d < 500) { trip.dist += d; trip.kwh += d / 1000 * kwhPerKm(sp); }
     }
     var pdt = lastPosT ? (now - lastPosT) / 1000 : 0;
     lastPosT = now;
     if (sp > 3 && pdt > 0 && pdt < 5) trip.mov += pdt;
     trip.last = now; save('trip', trip);
-    if (c.accuracy < 50 || !lastFix) lastFix = fix;
+    if (good || !lastFix) lastFix = fix;
     curPos = { lat: c.latitude, lon: c.longitude, acc: c.accuracy };
+
+    // Koers: van de GPS als je rijdt, anders uit twee posities
+    var hd = null;
+    if (sp > 8) {
+      if (c.heading !== null && !isNaN(c.heading) && c.heading >= 0) hd = c.heading;
+      else if (prevGps && hav(prevGps, fix) > 5) hd = bearing(prevGps, fix);
+    }
+    // G-meter bijstellen met de snelheidsverandering en de bochtsnelheid
+    if (prevGps && good) {
+      var gdt = (t - prevGps.t) / 1000;
+      var hRate = hd !== null && prevGps.hd !== null ? wrap180(hd - prevGps.hd) / gdt : null;
+      proc.gps(prevGps.v, ms, gdt, hRate);
+      calDirty = true;
+    }
+    prevGps = { lat: fix.lat, lon: fix.lon, t: t, v: good ? ms : null, hd: hd };
+
     gpsSpeed = sp; gpsAt = now; estSpeed = sp;
-    gpsHeading = (c.heading !== null && !isNaN(c.heading) && sp > 8) ? c.heading : null;
+    if (sp < 1) { if (!stillSince) stillSince = now; } else stillSince = 0;
+    gpsHeading = hd; if (hd !== null) gpsHeadingAt = now;
+    learnCompass();
     maybePlace(c.latitude, c.longitude);
-    if (placeEl.textContent === 'GPS zoeken…' || placeEl.dataset.err) { placeEl.textContent = '±' + Math.round(c.accuracy) + ' m'; delete placeEl.dataset.err; }
+    if (placeEl.textContent === 'GPS zoeken…' || placeEl.dataset.err) setPlace('±' + Math.round(c.accuracy) + ' m');
   }
-  var placeEl = $('place');
   function onPosErr(e) {
-    placeEl.textContent = e.code === 1 ? 'Geen toegang tot locatie' : 'GPS niet beschikbaar';
-    placeEl.dataset.err = '1';
+    setPlace(e.code === 1 ? 'Geen toegang tot locatie' : e.code === 3 ? 'GPS zoeken…' : 'GPS niet beschikbaar', e.code !== 3);
   }
 
   // Straatnaam via OpenStreetMap (max 1 keer per 30 s en na 150 m)
   var lastPlaceAt = 0, lastPlacePos = null, placeBusy = false;
   function maybePlace(lat, lon) {
     var now = Date.now();
-    if (placeBusy || now - lastPlaceAt < 30000) return;
+    if (placeBusy || now - lastPlaceAt < 30000 || !navigator.onLine) return;
     if (lastPlacePos && hav(lastPlacePos, { lat: lat, lon: lon }) < 150) return;
     placeBusy = true; lastPlaceAt = now; lastPlacePos = { lat: lat, lon: lon };
-    fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=17&accept-language=nl&lat=' + lat + '&lon=' + lon)
+    fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=17&accept-language=nl&lat=' + lat.toFixed(5) + '&lon=' + lon.toFixed(5))
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (j) {
         if (!j || !j.address) return;
@@ -532,110 +883,95 @@ body { touch-action: none; }
         var road = a.road || a.pedestrian || a.cycleway || a.path || '';
         var town = a.city || a.town || a.village || a.suburb || '';
         var t = [road, town].filter(Boolean).join(', ');
-        if (t) placeEl.textContent = t;
+        if (t) setPlace(t);
       })
       .catch(function () {})
       .then(function () { placeBusy = false; });
   }
 
-  // ---------- Beweging en kompas ----------
-  function screenAngle() {
-    if (screen.orientation && typeof screen.orientation.angle === 'number') return screen.orientation.angle;
-    return typeof window.orientation === 'number' ? window.orientation : 0;
-  }
-  function onMotion(e) {
-    var a = e.acceleration;
-    if (!a || a.x === null) return;
-    var ang = screenAngle();
-    // Telefoon rechtop in houder, scherm naar bestuurder. Vooruit = van het scherm af = -z.
-    var lon = (a.z || 0) * gSign; // voor/achter: getest in de auto, optrekken = +
-    var lat;
-    if (ang === 90) lat = -(a.y || 0);
-    else if (ang === -90 || ang === 270) lat = (a.y || 0);
-    else lat = (a.x || 0);
-    lat *= gSign;
-    var k = 0.15;
-    aLong += (lon - aLong) * k;
-    aLat += (lat - aLat) * k;
-    var now = performance.now();
-    var dt = lastMotion ? (now - lastMotion) / 1000 : 0;
-    lastMotion = now;
-    // Vloeiende snelheid tussen GPS-fixes
-    if (smoothOn && estSpeed !== null && dt > 0 && dt < 0.2 && Date.now() - gpsAt < 2500) {
-      estSpeed = Math.max(0, estSpeed + aLong * dt * 3.6);
-      // blijf dicht bij de laatste GPS-meting
-      if (gpsSpeed !== null) estSpeed = Math.min(Math.max(estSpeed, gpsSpeed - 6), gpsSpeed + 6);
-    }
-  }
-  function onOrient(e) {
-    var h = null;
-    if (typeof e.webkitCompassHeading === 'number' && !isNaN(e.webkitCompassHeading)) {
-      h = e.webkitCompassHeading + screenAngle();
-    } else if (e.absolute && typeof e.alpha === 'number') {
-      h = 360 - e.alpha + screenAngle();
-    }
-    if (h !== null) magHeading = (h % 360 + 360) % 360;
-  }
-
   // ---------- Render-lus ----------
-  function fmt1(n) { return n.toFixed(1).replace('.', ','); }
-  function fmt2(n) { return n.toFixed(2).replace('.', ','); }
   function renderTrip() {
     var secs = Math.max(0, trip.mov || 0);
     var h = Math.floor(secs / 3600), m = Math.floor(secs / 60) % 60;
-    $('tTime').textContent = h + ':' + String(m).padStart(2, '0');
+    $('tTime').textContent = h + ':' + pad2(m);
     var km = trip.dist / 1000;
     $('tDist').textContent = fmt1(km) + ' km';
     $('tAvg').textContent = '⌀ ' + (secs > 30 ? Math.round(km / (secs / 3600)) : 0) + ' km/u';
-    var kwh = km * KWH_PER_KM;
-    $('ekwh').textContent = '≈ ' + fmt1(kwh) + ' kWh';
-    $('ecost').textContent = '≈ €' + fmt2(kwh * PRICE_KWH) + ' bij €' + fmt2(PRICE_KWH);
+    if (energyOn) {
+      $('ekwh').textContent = '≈ ' + fmt1(trip.kwh) + ' kWh';
+      $('ecost').textContent = '≈ €' + fmt2(trip.kwh * PRICE_KWH) + ' bij €' + fmt2(PRICE_KWH) + (km > 1 ? ' · ' + Math.round(trip.kwh / km * 1000) + ' Wh/km' : '');
+    }
   }
-  var lastSlow = 0;
-  function frame() {
+
+  var gdot = $('gdot'), gtrail = $('gtrail'), gpeak = $('gpeak'), gcal = $('gcal');
+  var trail = [], lastTrail = 0, lastSlow = 0, lastFrame = 0, shownCal = -1;
+  var peakPt = null, peakMag = 0, peakAt = 0;
+  function gToXY(gl, gt) {
+    // Stip toont de kracht die je voelt: optrekken = omlaag, remmen = omhoog, bocht rechts = naar links
+    var x = -gt * R_RIM / G_RIM, y = gl * R_RIM / G_RIM;
+    var r = Math.sqrt(x * x + y * y), max = R_RIM + 2;
+    if (r > max) { x *= max / r; y *= max / r; }
+    return [50 + x, 50 + y];
+  }
+  function frame(ts) {
+    var fdt = lastFrame ? Math.min(0.25, (ts - lastFrame) / 1000) : 0.016;
+    lastFrame = ts;
+    var now = Date.now();
+
     // Snelheid
-    if (gpsSpeed === null || Date.now() - gpsAt > 5000) showSpeed('  -');
+    if (gpsSpeed === null || now - gpsAt > 5000) showSpeed('  -');
     else showSpeed(String(Math.round(smoothOn && estSpeed !== null ? estSpeed : gpsSpeed)));
-    // Richting: GPS-koers bij rijden, anders magnetisch kompas
-    var target = gpsHeading !== null ? gpsHeading : magHeading;
+
+    // Richting: GPS-koers bij rijden, anders telefoonkompas (met geleerde correctie)
+    var target = gpsHeading !== null && now - gpsHeadingAt < 4000 ? gpsHeading : magHeading();
     if (target !== null) {
-      var diff = ((target - heading + 540) % 360) - 180;
-      heading = (heading + diff * 0.15 + 360) % 360;
+      if (!headingKnown) { heading = target; headingKnown = true; }
+      heading = wrap360(heading + wrap180(target - heading) * (1 - Math.exp(-fdt / 0.25)));
       renderCompass(heading);
     }
+
     // Parkeerplek
     if (parkShow && park) {
       if (curPos) {
         var pd = hav(curPos, park);
-        $('pdist').textContent = pd < 1000 ? Math.round(pd / 5) * 5 + ' m' : (pd / 1000).toFixed(1).replace('.', ',') + ' km';
-        var brg = bearing(curPos, park);
-        var rot = ((brg - heading) % 360 + 360) % 360;
-        $('parrow').style.transform = 'rotate(' + rot.toFixed(0) + 'deg)';
-        if (pd < 15) $('pdist').textContent = 'Je bent er';
+        $('pdist').textContent = pd < 15 ? 'Je bent er' : pd < 1000 ? Math.round(pd / 5) * 5 + ' m' : fmt1(pd / 1000) + ' km';
+        $('parrow').style.transform = 'rotate(' + wrap360(bearing(curPos, park) - heading).toFixed(0) + 'deg)';
       } else { $('pdist').textContent = 'GPS zoeken…'; }
     }
+
     // G-kracht
-    var gl = aLong / 9.81, gt = aLat / 9.81;
+    var gl = proc.lon / G, gt = proc.lat / G;
     var mag = Math.sqrt(gl * gl + gt * gt);
-    var scale = 18 / 0.5; // 0,5 g = rand
-    // Stip toont de kracht die je voelt: optrekken = naar achteren, remmen = naar voren, bocht rechts = naar links
-    var dx = Math.max(-18, Math.min(18, -gt * scale));
-    var dy = Math.max(-18, Math.min(18, gl * scale));
-    var dot = $('gdot'); dot.setAttribute('cx', (23 + dx).toFixed(1)); dot.setAttribute('cy', (23 + dy).toFixed(1));
-    var now = Date.now();
+    var p = gToXY(gl, gt);
+    gdot.setAttribute('cx', p[0].toFixed(1)); gdot.setAttribute('cy', p[1].toFixed(1));
+    if (ts - lastTrail > 50) {
+      lastTrail = ts;
+      trail.push(p[0].toFixed(1) + ',' + p[1].toFixed(1));
+      if (trail.length > 30) trail.shift();
+      gtrail.setAttribute('points', trail.join(' '));
+    }
+    // Piekring: houdt 3 s de grootste kracht vast
+    if (mag > peakMag || now - peakAt > 3000) { peakMag = mag; peakPt = p; peakAt = now; }
+    gpeak.hidden = peakMag < 0.08;
+    if (peakPt) { gpeak.setAttribute('cx', peakPt[0].toFixed(1)); gpeak.setAttribute('cy', peakPt[1].toFixed(1)); }
+
     if (now - lastSlow > 250) {
       lastSlow = now;
-      // Voor/achter met teken: optrekken +, remmen (of optrekken in z'n achteruit) -
-      var gShow = Math.abs(gl) >= Math.abs(gt) ? (gl < 0 ? -mag : mag) : mag;
-      $('gval').textContent = (gShow < -0.005 ? '-' : '') + fmt2(Math.abs(gShow)) + ' g';
+      // Voor/achter met teken: optrekken +, remmen -
+      var shown = mag < 0.02 ? 0 : mag;
+      var neg = shown > 0 && Math.abs(gl) >= Math.abs(gt) && gl < 0;
+      $('gval').textContent = (neg ? '-' : '') + fmt2(shown) + ' g';
       var txt = 'rustig';
-      if (mag > 0.05) {
-        if (Math.abs(gt) > Math.abs(gl)) txt = 'bocht ' + (gt > 0 ? 'rechts' : 'links');
-        else txt = gl > 0 ? 'optrekken' : 'remmen';
-      }
+      if (mag > 0.05) txt = Math.abs(gt) > Math.abs(gl) ? 'bocht ' + (gt > 0 ? 'rechts' : 'links') : gl > 0 ? 'optrekken' : 'remmen';
       $('gtxt').textContent = txt;
-      var d = new Date();
-      $('clock').textContent = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+      var conf = Math.round(proc.confidence() * 20) / 20;
+      if (conf !== shownCal) {
+        shownCal = conf;
+        gcal.setAttribute('stroke-dashoffset', (301.6 * (1 - conf)).toFixed(1));
+        gcal.style.opacity = conf >= 1 ? '0' : '';
+      }
+      renderPeaks();
+      $('clock').textContent = hhmm(new Date());
       renderTrip();
     }
     requestAnimationFrame(frame);
@@ -644,12 +980,10 @@ body { touch-action: none; }
   // ---------- Scherm aan ----------
   var wakeLock = null;
   function keepAwake() {
-    if (!('wakeLock' in navigator)) return;
+    if (!('wakeLock' in navigator) || (wakeLock && !wakeLock.released)) return;
     navigator.wakeLock.request('screen').then(function (l) { wakeLock = l; }).catch(function () {});
   }
-  document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState === 'visible') keepAwake();
-  });
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') keepAwake(); });
 
   // ---------- Start ----------
   var gpsStarted = false, motionStarted = false;
@@ -667,35 +1001,29 @@ body { touch-action: none; }
   function startMotion() {
     if (motionStarted) return; motionStarted = true;
     var asks = [];
-    if (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === 'function') asks.push(DeviceMotionEvent.requestPermission().catch(function () {}));
-    if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') asks.push(DeviceOrientationEvent.requestPermission().catch(function () {}));
-    Promise.all(asks).then(function () {
+    if (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === 'function') asks.push(DeviceMotionEvent.requestPermission().catch(function () { return 'denied'; }));
+    if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') asks.push(DeviceOrientationEvent.requestPermission().catch(function () { return 'denied'; }));
+    Promise.all(asks).then(function (res) {
+      $('toast').classList.remove('show');
+      if (res.indexOf('denied') >= 0) toast('Geen toegang tot beweging: kompas en G-kracht staan uit', 3500);
       window.addEventListener('devicemotion', onMotion);
       if ('ondeviceorientationabsolute' in window) window.addEventListener('deviceorientationabsolute', onOrient);
       else window.addEventListener('deviceorientation', onOrient);
-      hideHint();
     });
     keepAwake();
   }
-  function showHint() {
-    var el = $('toast'); el.textContent = 'Tik op het scherm voor kompas en G-kracht';
-    clearTimeout(toastTimer); el.classList.add('show');
-  }
-  function hideHint() { $('toast').classList.remove('show'); }
-
   $('btnStart').addEventListener('click', function () {
     save('started', true);
     $('start').hidden = true;
     startGps();
     startMotion();
   });
-
   if (load('started', false)) {
     // Al eerder gestart: geen startscherm, GPS meteen aan.
     $('start').hidden = true;
     startGps();
     if (needsMotionAsk()) {
-      showHint();
+      var el = $('toast'); el.textContent = 'Tik op het scherm voor kompas en G-kracht'; el.classList.add('show');
       var firstTap = function () {
         document.removeEventListener('click', firstTap, true);
         document.removeEventListener('touchend', firstTap, true);
@@ -709,19 +1037,10 @@ body { touch-action: none; }
   }
 
   // ---------- Parkeerplek ----------
-  function bearing(a, b) {
-    var toR = Math.PI / 180;
-    var y = Math.sin((b.lon - a.lon) * toR) * Math.cos(b.lat * toR);
-    var x = Math.cos(a.lat * toR) * Math.sin(b.lat * toR) - Math.sin(a.lat * toR) * Math.cos(b.lat * toR) * Math.cos((b.lon - a.lon) * toR);
-    return (Math.atan2(y, x) / toR + 360) % 360;
-  }
   function renderPark() {
-    $('btnPark').setAttribute('aria-pressed', park ? 'true' : 'false');
+    setBtn('btnPark', !!park);
     $('parkTile').hidden = !(parkShow && park);
-    if (park) {
-      var d = new Date(park.t);
-      $('pinfo').textContent = 'geparkeerd om ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
-    }
+    if (park) $('pinfo').textContent = 'geparkeerd om ' + hhmm(new Date(park.t));
   }
   function savePark() {
     if (!curPos) { toast('Nog geen GPS, probeer zo opnieuw'); return; }
@@ -731,19 +1050,7 @@ body { touch-action: none; }
     toast('Parkeerplek opgeslagen');
     renderPark();
   }
-  var parkHold = null, parkHeld = false;
-  function parkDown() {
-    parkHeld = false;
-    parkHold = setTimeout(function () { parkHeld = true; savePark(); }, 800);
-  }
-  function parkUp() { clearTimeout(parkHold); }
-  $('btnPark').addEventListener('touchstart', parkDown, { passive: true });
-  $('btnPark').addEventListener('touchend', parkUp);
-  $('btnPark').addEventListener('touchcancel', parkUp);
-  $('btnPark').addEventListener('mousedown', parkDown);
-  $('btnPark').addEventListener('mouseup', parkUp);
-  $('btnPark').addEventListener('click', function () {
-    if (parkHeld) { parkHeld = false; return; }
+  holdable($('btnPark'), 800, savePark, function () {
     if (!park) { savePark(); return; }
     parkShow = !parkShow;
     renderPark();
@@ -753,8 +1060,6 @@ body { touch-action: none; }
   });
   renderPark();
 
-  // ---------- Automatisch updaten ----------
-  // Haalt de nieuwste versie op langs de cache heen en herlaadt als er een nieuwe is.
   // ---------- Help ----------
   var helpHidden = load('helpHidden', false);
   function renderHelpBtn() { $('btnHelp').hidden = helpHidden; }
@@ -764,7 +1069,7 @@ body { touch-action: none; }
   $('btnHelpClose').addEventListener('click', closeHelp);
   $('btnHelpHide').addEventListener('click', function () {
     helpHidden = true; save('helpHidden', true); renderHelpBtn(); closeHelp();
-    toast('Tik 5 keer op je snelheid om hem terug te halen');
+    toast('Tik 5 keer op je snelheid om hem terug te halen', 2500);
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !$('help').hidden) closeHelp(); });
   var speedTaps = [];
@@ -779,25 +1084,30 @@ body { touch-action: none; }
   });
   renderHelpBtn();
 
-  var APP_VERSION = '12';
+  // ---------- Automatisch updaten ----------
+  // Haalt de nieuwste versie op langs de cache heen en herlaadt als er een nieuwe is.
   function checkUpdate() {
+    if (!navigator.onLine) return;
     fetch('./?nocache=' + Date.now(), { cache: 'no-store' })
       .then(function (r) { return r.ok ? r.text() : ''; })
       .then(function (t) {
         var m = t.match(/var APP_VERSION = '([^']+)'/);
-        if (m && m[1] !== APP_VERSION) location.replace('./?v=' + m[1]);
+        if (m && m[1] !== APP_VERSION) { if (calDirty) storeCal(); location.replace('./?v=' + m[1]); }
       })
       .catch(function () {});
   }
-  checkUpdate();
-  document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState === 'visible') checkUpdate();
-  });
 
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState !== 'visible') return;
+    checkUpdate(); checkSchedule(); measureCompass();
+  });
+  if (screen.orientation && screen.orientation.addEventListener) screen.orientation.addEventListener('change', measureCompass);
+  checkUpdate();
   applyColor(false);
   checkSchedule();
   setInterval(checkSchedule, 20000);
-  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') checkSchedule(); });
+  renderCompass(0);
+  renderTrip();
   requestAnimationFrame(frame);
 })();
 </script>
